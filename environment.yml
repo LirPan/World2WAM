@@ -1,0 +1,13 @@
+# Conda env for World2WAM minimal + FastWAM (read-only import).
+# Create: bash scripts/setup_conda_env.sh
+name: world2wam
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.7.1+cu128
+      - torchvision==0.22.1+cu128

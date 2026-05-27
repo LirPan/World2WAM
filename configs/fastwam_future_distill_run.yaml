@@ -1,0 +1,34 @@
+project_name: world2wam_minimal
+fastwam_root: /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM
+libero_root: /DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/../code/LIBERO
+fastwam_task_config: libero_uncond_2cam224_1e-4
+
+use_future_latent_distill: true
+lambda_fwd: 0.1
+future_horizon: 1
+future_latent_dim: 48
+hidden_dim: 1024
+action_dim: 7
+use_gt_action_for_future_head: true
+freeze_fastwam_backbone: true
+anchor_action_idx: 0
+
+batch_size: 4
+num_epochs: 1
+lr: 1.0e-4
+seed: 42
+num_workers: 4
+device: cuda
+
+lerobot_dataset_dirs:
+  - /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/data/libero_mujoco3.3.2/libero_spatial_no_noops_lerobot
+cache_dir: ./data/future_latents
+output_dir: ./experiments/future_latent_distill_full
+checkpoint_path: /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt
+dataset_stats_path: /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+
+mixed_precision: bf16
+log_every: 50
+save_every: 2000
+max_train_steps: null
+precompute_max_samples: 0

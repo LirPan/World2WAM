@@ -1,0 +1,8 @@
+{
+  "future_head_called": false,
+  "inverse_head_called": false,
+  "avg_latency_ms": 1509.7006876021624,
+  "num_batches": 2,
+  "success_rate": null,
+  "offline_action_mse": 0.0
+}

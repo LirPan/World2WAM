@@ -1,0 +1,72 @@
+代理已生效，外网连接正常
+代理已生效，外网连接正常
+INFO:fastwam.models.wan22.helpers.loader:Loading Wan2.2-TI2V-5B components...
+INFO:fastwam.models.wan22.helpers.loader:Skipping pretrained text encoder/tokenizer load (`load_text_encoder=False`); training must provide cached `context/context_mask`.
+INFO:fastwam.models.wan22.helpers.loader:Finished loading Wan2.2-TI2V-5B components in 48.14 seconds.
+INFO:fastwam.models.wan22.action_dit:ActionDiT backbone payload policy: {'skip_prefixes': ['action_encoder.', 'head.'], 'alpha_scaling': True, 'interpolation': 'sequential_1d_linear_align_corners_true'}
+INFO:fastwam.models.wan22.action_dit:Loaded ActionDiT backbone from /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/ActionDiT_linear_interp_Wan22_alphascale_1024hdim.pt (keys=820; random_kept_prefixes=['action_encoder.', 'head.']).
+INFO:fastwam.models.wan22.mot:Initialized MoT with experts: ['video', 'action'], num_layers=30
+INFO:fastwam.models.wan22.mot:  Expert 'video': num_params=5.00 B
+INFO:fastwam.models.wan22.mot:  Expert 'action': num_params=1.02 B
+INFO:datasets:PyTorch version 2.7.1 available.
+INFO:fastwam.datasets.lerobot.robot_video_dataset:Using dataset stats: /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+epoch 0:   0%|          | 0/13307 [00:00<?, ?it/s]epoch 0:   0%|          | 0/13307 [00:08<?, ?it/s]
+Traceback (most recent call last):
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/train/train_fastwam_future_distill.py", line 243, in <module>
+    main()
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/train/train_fastwam_future_distill.py", line 238, in main
+    train_future_distill(cfg, args)
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/train/train_fastwam_future_distill.py", line 128, in train_future_distill
+    raise ValueError(FUTURE_LATENT_MISSING_MSG)
+ValueError: future_latent is missing. Please run precompute_future_latents first or enable online future_obs encoding.
+代理已生效，外网连接正常
+代理已生效，外网连接正常
+INFO:fastwam.models.wan22.helpers.loader:Loading Wan2.2-TI2V-5B components...
+INFO:fastwam.models.wan22.helpers.loader:Skipping pretrained text encoder/tokenizer load (`load_text_encoder=False`); training must provide cached `context/context_mask`.
+INFO:fastwam.models.wan22.helpers.loader:Finished loading Wan2.2-TI2V-5B components in 46.62 seconds.
+INFO:fastwam.models.wan22.action_dit:ActionDiT backbone payload policy: {'skip_prefixes': ['action_encoder.', 'head.'], 'alpha_scaling': True, 'interpolation': 'sequential_1d_linear_align_corners_true'}
+INFO:fastwam.models.wan22.action_dit:Loaded ActionDiT backbone from /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/ActionDiT_linear_interp_Wan22_alphascale_1024hdim.pt (keys=820; random_kept_prefixes=['action_encoder.', 'head.']).
+INFO:fastwam.models.wan22.mot:Initialized MoT with experts: ['video', 'action'], num_layers=30
+INFO:fastwam.models.wan22.mot:  Expert 'video': num_params=5.00 B
+INFO:fastwam.models.wan22.mot:  Expert 'action': num_params=1.02 B
+INFO:datasets:PyTorch version 2.7.1 available.
+INFO:fastwam.datasets.lerobot.robot_video_dataset:Using dataset stats: /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+epoch 0:   0%|          | 0/32 [00:00<?, ?it/s]epoch 0:   0%|          | 0/32 [00:08<?, ?it/s]
+Traceback (most recent call last):
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/train/train_fastwam_future_distill.py", line 246, in <module>
+    main()
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/train/train_fastwam_future_distill.py", line 241, in main
+    train_future_distill(cfg, args)
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/train/train_fastwam_future_distill.py", line 133, in train_future_distill
+    fw_out = wrapper.forward_train(batch, use_future_latent_distill=True)
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/wrappers/fastwam_wrapper.py", line 121, in forward_train
+    hidden = self.extract_hidden({"action_tokens": self._captured_action_tokens}, batch)
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/wrappers/fastwam_wrapper.py", line 205, in extract_hidden
+    anchor = int(batch.get("anchor_action_idx", 0))
+TypeError: int() argument must be a string, a bytes-like object or a real number, not 'list'
+代理已生效，外网连接正常
+代理已生效，外网连接正常
+INFO:fastwam.models.wan22.helpers.loader:Loading Wan2.2-TI2V-5B components...
+INFO:fastwam.models.wan22.helpers.loader:Skipping pretrained text encoder/tokenizer load (`load_text_encoder=False`); training must provide cached `context/context_mask`.
+INFO:fastwam.models.wan22.helpers.loader:Finished loading Wan2.2-TI2V-5B components in 48.14 seconds.
+INFO:fastwam.models.wan22.action_dit:ActionDiT backbone payload policy: {'skip_prefixes': ['action_encoder.', 'head.'], 'alpha_scaling': True, 'interpolation': 'sequential_1d_linear_align_corners_true'}
+INFO:fastwam.models.wan22.action_dit:Loaded ActionDiT backbone from /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/ActionDiT_linear_interp_Wan22_alphascale_1024hdim.pt (keys=820; random_kept_prefixes=['action_encoder.', 'head.']).
+INFO:fastwam.models.wan22.mot:Initialized MoT with experts: ['video', 'action'], num_layers=30
+INFO:fastwam.models.wan22.mot:  Expert 'video': num_params=5.00 B
+INFO:fastwam.models.wan22.mot:  Expert 'action': num_params=1.02 B
+INFO:datasets:PyTorch version 2.7.1 available.
+INFO:fastwam.datasets.lerobot.robot_video_dataset:Using dataset stats: /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+epoch 0:   0%|          | 0/32 [00:00<?, ?it/s]epoch 0:   3%|▎         | 1/32 [00:06<03:08,  6.09s/it]epoch 0:   6%|▋         | 2/32 [00:06<01:25,  2.85s/it]epoch 0:   9%|▉         | 3/32 [00:08<01:13,  2.55s/it]epoch 0:  12%|█▎        | 4/32 [00:09<00:50,  1.81s/it]epoch 0:  12%|█▎        | 4/32 [00:12<00:50,  1.81s/it, loss_action=0.1187, loss_future=0.0322, loss_total=0.1219, epoch=0.0000]epoch 0:  16%|█▌        | 5/32 [00:12<01:01,  2.28s/it, loss_action=0.1187, loss_future=0.0322, loss_total=0.1219, epoch=0.0000]epoch 0:  19%|█▉        | 6/32 [00:13<00:45,  1.73s/it, loss_action=0.1187, loss_future=0.0322, loss_total=0.1219, epoch=0.0000]epoch 0:  22%|██▏       | 7/32 [00:16<00:54,  2.18s/it, loss_action=0.1187, loss_future=0.0322, loss_total=0.1219, epoch=0.0000]epoch 0:  25%|██▌       | 8/32 [00:17<00:40,  1.69s/it, loss_action=0.1187, loss_future=0.0322, loss_total=0.1219, epoch=0.0000]epoch 0:  28%|██▊       | 9/32 [00:20<00:50,  2.18s/it, loss_action=0.1187, loss_future=0.0322, loss_total=0.1219, epoch=0.0000]epoch 0:  28%|██▊       | 9/32 [00:20<00:50,  2.18s/it, loss_action=0.0823, loss_future=0.0095, loss_total=0.0832, epoch=0.0000]epoch 0:  31%|███▏      | 10/32 [00:20<00:37,  1.70s/it, loss_action=0.0823, loss_future=0.0095, loss_total=0.0832, epoch=0.0000]epoch 0:  34%|███▍      | 11/32 [00:24<00:45,  2.15s/it, loss_action=0.0823, loss_future=0.0095, loss_total=0.0832, epoch=0.0000]epoch 0:  38%|███▊      | 12/32 [00:24<00:33,  1.68s/it, loss_action=0.0823, loss_future=0.0095, loss_total=0.0832, epoch=0.0000]epoch 0:  41%|████      | 13/32 [00:28<00:42,  2.21s/it, loss_action=0.0823, loss_future=0.0095, loss_total=0.0832, epoch=0.0000]epoch 0:  44%|████▍     | 14/32 [00:28<00:31,  1.75s/it, loss_action=0.0823, loss_future=0.0095, loss_total=0.0832, epoch=0.0000]epoch 0:  44%|████▍     | 14/32 [00:31<00:31,  1.75s/it, loss_action=0.0992, loss_future=0.0084, loss_total=0.1000, epoch=0.0000]epoch 0:  47%|████▋     | 15/32 [00:31<00:36,  2.16s/it, loss_action=0.0992, loss_future=0.0084, loss_total=0.1000, epoch=0.0000]epoch 0:  50%|█████     | 16/32 [00:32<00:27,  1.72s/it, loss_action=0.0992, loss_future=0.0084, loss_total=0.1000, epoch=0.0000]epoch 0:  53%|█████▎    | 17/32 [00:35<00:32,  2.17s/it, loss_action=0.0992, loss_future=0.0084, loss_total=0.1000, epoch=0.0000]epoch 0:  56%|█████▋    | 18/32 [00:36<00:24,  1.72s/it, loss_action=0.0992, loss_future=0.0084, loss_total=0.1000, epoch=0.0000]epoch 0:  59%|█████▉    | 19/32 [00:39<00:26,  2.02s/it, loss_action=0.0992, loss_future=0.0084, loss_total=0.1000, epoch=0.0000]epoch 0:  59%|█████▉    | 19/32 [00:39<00:26,  2.02s/it, loss_action=0.0871, loss_future=0.0064, loss_total=0.0877, epoch=0.0000]epoch 0:  62%|██████▎   | 20/32 [00:39<00:19,  1.59s/it, loss_action=0.0871, loss_future=0.0064, loss_total=0.0877, epoch=0.0000]epoch 0:  66%|██████▌   | 21/32 [00:43<00:24,  2.20s/it, loss_action=0.0871, loss_future=0.0064, loss_total=0.0877, epoch=0.0000]epoch 0:  69%|██████▉   | 22/32 [00:43<00:17,  1.70s/it, loss_action=0.0871, loss_future=0.0064, loss_total=0.0877, epoch=0.0000]epoch 0:  72%|███████▏  | 23/32 [00:47<00:19,  2.18s/it, loss_action=0.0871, loss_future=0.0064, loss_total=0.0877, epoch=0.0000]epoch 0:  75%|███████▌  | 24/32 [00:47<00:13,  1.73s/it, loss_action=0.0871, loss_future=0.0064, loss_total=0.0877, epoch=0.0000]epoch 0:  75%|███████▌  | 24/32 [00:50<00:13,  1.73s/it, loss_action=0.1281, loss_future=0.0048, loss_total=0.1286, epoch=0.0000]epoch 0:  78%|███████▊  | 25/32 [00:50<00:13,  1.97s/it, loss_action=0.1281, loss_future=0.0048, loss_total=0.1286, epoch=0.0000]epoch 0:  81%|████████▏ | 26/32 [00:51<00:09,  1.58s/it, loss_action=0.1281, loss_future=0.0048, loss_total=0.1286, epoch=0.0000]epoch 0:  84%|████████▍ | 27/32 [00:53<00:09,  1.84s/it, loss_action=0.1281, loss_future=0.0048, loss_total=0.1286, epoch=0.0000]epoch 0:  88%|████████▊ | 28/32 [00:54<00:05,  1.45s/it, loss_action=0.1281, loss_future=0.0048, loss_total=0.1286, epoch=0.0000]epoch 0:  91%|█████████ | 29/32 [00:57<00:05,  1.98s/it, loss_action=0.1281, loss_future=0.0048, loss_total=0.1286, epoch=0.0000]epoch 0:  91%|█████████ | 29/32 [00:58<00:05,  1.98s/it, loss_action=0.0368, loss_future=0.0048, loss_total=0.0372, epoch=0.0000]epoch 0:  94%|█████████▍| 30/32 [00:58<00:03,  1.59s/it, loss_action=0.0368, loss_future=0.0048, loss_total=0.0372, epoch=0.0000]epoch 0:  97%|█████████▋| 31/32 [01:01<00:02,  2.00s/it, loss_action=0.0368, loss_future=0.0048, loss_total=0.0372, epoch=0.0000]epoch 0: 100%|██████████| 32/32 [01:01<00:00,  1.60s/it, loss_action=0.0368, loss_future=0.0048, loss_total=0.0372, epoch=0.0000]epoch 0: 100%|██████████| 32/32 [01:01<00:00,  1.94s/it, loss_action=0.0368, loss_future=0.0048, loss_total=0.0372, epoch=0.0000]
+INFO:__main__:Saved future head to /DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/future_latent_distill/checkpoints/future_head_final.pt
+Traceback (most recent call last):
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/eval/eval_action_only_fastwam.py", line 130, in <module>
+    main()
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/eval/eval_action_only_fastwam.py", line 92, in main
+    _, ms = run_action_only_batch(wrapper, batch)
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/wrappers/action_only_inference.py", line 21, in run_action_only_batch
+    out = wrapper.forward_action_only(batch)
+  File "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/src/wrappers/fastwam_wrapper.py", line 187, in forward_action_only
+    out = self.model.infer_action(**{k: v for k, v in infer_kwargs.items() if v is not None})
+  File "/DATA/disk1/yjh_space/miniconda3/envs/world2wam/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+TypeError: FastWAM.infer_action() missing 1 required positional argument: 'prompt'

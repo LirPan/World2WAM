@@ -1,0 +1,9 @@
+data/future_latents/
+experiments/*/checkpoints/
+experiments/bg_jobs/
+experiments/libero_eval/
+experiments/future_latent_distill_full/logs/
+__pycache__/
+*.pt
+*.pth
+.env

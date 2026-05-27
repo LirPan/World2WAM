@@ -1,0 +1,9 @@
+{
+  "forward_mse": 0.0026096851215697825,
+  "inverse_action_mse": 0.06478263475000859,
+  "cycle_action_mse": 0.06473453147336841,
+  "forward_cosine": 0.9769194722175598,
+  "num_batches": 10,
+  "future_head_called_in_action_inference": false,
+  "inverse_head_called_in_action_inference": false
+}

@@ -1,0 +1,32 @@
+project_name: world2wam_minimal
+fastwam_root: ../code/FastWAM
+libero_root: ../code/LIBERO
+fastwam_task_config: libero_uncond_2cam224_1e-4
+
+use_future_latent_distill: true
+lambda_fwd: 0.1
+future_horizon: 1
+future_latent_dim: 48
+hidden_dim: 1024
+action_dim: 7
+
+use_gt_action_for_future_head: true
+freeze_fastwam_backbone: true
+anchor_action_idx: 0
+
+batch_size: 16
+num_epochs: 5
+lr: 1.0e-4
+seed: 42
+num_workers: 4
+device: cuda
+
+lerobot_dataset_dirs: null
+cache_dir: ./data/future_latents
+output_dir: ./experiments/future_latent_distill
+checkpoint_path: null
+future_head_checkpoint: null
+
+mixed_precision: bf16
+log_every: 10
+save_every: 500
