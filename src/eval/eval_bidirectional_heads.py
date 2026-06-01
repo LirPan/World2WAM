@@ -22,6 +22,7 @@ from src.losses.world2wam_losses import FUTURE_LATENT_MISSING_MSG
 from src.models.future_latent_head import FutureLatentHead
 from src.models.inverse_action_head import InverseActionHead
 from src.train.train_bidirectional_world2wam import _anchor_from_batch, _gt_action_from_batch
+from src.utils.checkpoint_utils import resolve_official_checkpoint, verify_future_latent_cache
 from src.utils.config import load_config
 from src.utils.path_utils import minimal_project_root, resolve_path
 from src.utils.seed import set_seed
@@ -39,7 +40,7 @@ def _load_head_state(path: Path, device: str) -> dict:
 def evaluate_heads(
     wrapper: FastWAMWrapper,
     future_head: FutureLatentHead,
-    inverse_head: InverseActionHead,
+    inverse_head: InverseActionHead | None,
     loader: DataLoader,
     device: str,
     max_batches: int,
@@ -66,23 +67,26 @@ def evaluate_heads(
             target_fl = target_fl.unsqueeze(0)
 
         pred_fl = future_head(hidden, gt_action)
-        pred_inv = inverse_head(hidden, target_fl)
-        recon = inverse_head(hidden, pred_fl)
-
         fwd_sum += F.mse_loss(pred_fl, target_fl).item()
-        inv_sum += F.mse_loss(pred_inv, gt_action).item()
-        cycle_sum += F.mse_loss(recon, gt_action).item()
         cos_sum += F.cosine_similarity(pred_fl, target_fl, dim=-1).mean().item()
+
+        if inverse_head is not None:
+            pred_inv = inverse_head(hidden, target_fl)
+            recon = inverse_head(hidden, pred_fl)
+            inv_sum += F.mse_loss(pred_inv, gt_action).item()
+            cycle_sum += F.mse_loss(recon, gt_action).item()
         count += 1
 
     n = max(count, 1)
-    return {
+    out = {
         "forward_mse": fwd_sum / n,
-        "inverse_action_mse": inv_sum / n,
-        "cycle_action_mse": cycle_sum / n,
         "forward_cosine": cos_sum / n,
         "num_batches": count,
     }
+    if inverse_head is not None:
+        out["inverse_action_mse"] = inv_sum / n
+        out["cycle_action_mse"] = cycle_sum / n
+    return out
 
 
 def main() -> None:
@@ -106,31 +110,27 @@ def main() -> None:
     inverse_ckpt = Path(args.inverse_head or ckpt_dir / "inverse_head_final.pt")
     if not future_ckpt.is_file():
         raise FileNotFoundError(f"future head checkpoint not found: {future_ckpt}")
-    if not inverse_ckpt.is_file():
-        raise FileNotFoundError(f"inverse head checkpoint not found: {inverse_ckpt}")
 
-    wrapper = FastWAMWrapper(
-        fastwam_root=cfg["fastwam_root"],
-        fastwam_task_config=cfg.get("fastwam_task_config", "libero_uncond_2cam224_1e-4"),
-        checkpoint_path=cfg.get("checkpoint_path"),
-        freeze_backbone=True,
-        device=device,
-        mixed_precision=cfg.get("mixed_precision", "bf16"),
-    )
+    resolve_official_checkpoint(cfg)
+    verify_future_latent_cache(cfg)
+    wrapper = FastWAMWrapper.from_config(cfg, backbone_mode="frozen")
 
     hidden_dim = int(cfg.get("hidden_dim") or wrapper.hidden_dim)
     action_dim = int(cfg.get("action_dim") or wrapper.action_dim)
     future_dim = int(cfg.get("future_latent_dim", 48))
 
     future_head = FutureLatentHead(hidden_dim, action_dim, future_dim).to(device)
-    inverse_head = InverseActionHead(hidden_dim, future_dim, action_dim).to(device)
     future_head.load_state_dict(_load_head_state(future_ckpt, device))
-    inv_state = torch.load(inverse_ckpt, map_location=device, weights_only=True)
-    if isinstance(inv_state, dict) and "inverse" in inv_state:
-        inv_state = inv_state["inverse"]
-    inverse_head.load_state_dict(inv_state)
     future_head.eval()
-    inverse_head.eval()
+
+    inverse_head: InverseActionHead | None = None
+    if inverse_ckpt.is_file():
+        inverse_head = InverseActionHead(hidden_dim, future_dim, action_dim).to(device)
+        inv_state = torch.load(inverse_ckpt, map_location=device, weights_only=True)
+        if isinstance(inv_state, dict) and "inverse" in inv_state:
+            inv_state = inv_state["inverse"]
+        inverse_head.load_state_dict(inv_state)
+        inverse_head.eval()
 
     base_ds, _ = build_fastwam_dataset(cfg)
     cache = FutureLatentCache(cfg["cache_dir"], dataset_name=cfg.get("project_name", "world2wam"))
@@ -152,15 +152,11 @@ def main() -> None:
     )
 
     metrics = evaluate_heads(wrapper, future_head, inverse_head, loader, device, args.max_batches)
-
-    # Action-only path must not use auxiliary heads
-    batch0 = collate_world2wam_batch([dataset[0]])
-    for k, v in batch0.items():
-        if isinstance(v, torch.Tensor):
-            batch0[k] = v.to(device)
-    wrapper.forward_action_only(batch0)
-    metrics["future_head_called_in_action_inference"] = False
-    metrics["inverse_head_called_in_action_inference"] = False
+    metrics["experiment_role"] = "bidirectional_analysis"
+    metrics["eval_type"] = "offline_head_mse_only"
+    metrics["note"] = (
+        "Representation analysis only; does not use infer_action or guarantee LIBERO success improvement."
+    )
 
     eval_dir = out_dir / "eval"
     eval_dir.mkdir(parents=True, exist_ok=True)

@@ -21,15 +21,23 @@ Commands:
   train_eval        resume 03->04 only (nohup, cache must exist)
   full_experiment   full 02->03->04 + LIBERO spatial success (nohup)
   libero_eval       LIBERO spatial success only (nohup)
+  policy_full       Policy full train + export + LIBERO smoke (nohup)
+  policy_train      Policy full train + export only, no LIBERO (nohup)
+  libero_compare    Official vs World2WAM LIBERO compare (nohup)
+  export_compare    Export policy_full + FULL_RUN LIBERO compare (nohup)
+  ablations         Bidirectional ablation validate + full grid (nohup)
+  paper_all         Full paper pipeline FULL_RUN=1 (nohup)
+  smoke_all         Full smoke: framework + policy20 + LIBERO + ablation + compare (nohup)
+  smoke_resume      Resume smoke from LIBERO sim step 4 (nohup)
   status            Show running jobs and last log lines
-  tail <job>        tail -f log (download_assets|full_pipeline|pipeline_b|full_experiment)
+  tail <job>        tail -f log (download_assets|full_pipeline|policy_full|...)
 
 Logs/PIDs: ${JOB_DIR}/
 EOF
 }
 
 cmd_status() {
-  for name in download_assets full_pipeline pipeline_b train_eval full_experiment libero_eval; do
+  for name in download_assets full_pipeline pipeline_b train_eval full_experiment libero_eval policy_full policy_train libero_compare export_compare ablations paper_all smoke_all smoke_resume; do
     pidfile="${JOB_DIR}/${name}.pid"
     logfile="${JOB_DIR}/${name}.log"
     if [[ -f "${pidfile}" ]]; then
@@ -65,6 +73,14 @@ cmd_launch() {
     train_eval) script_name="bg_train_eval_only" ;;
     full_experiment) script_name="bg_run_full_experiment" ;;
     libero_eval) script_name="bg_run_libero_eval_only" ;;
+    policy_full) script_name="bg_run_policy_full" ;;
+    policy_train) script_name="bg_run_policy_train_only" ;;
+    libero_compare) script_name="bg_run_libero_compare" ;;
+    export_compare) script_name="bg_run_export_compare" ;;
+    ablations) script_name="bg_run_ablations" ;;
+    paper_all) script_name="bg_run_paper_all" ;;
+    smoke_all) script_name="bg_run_smoke_all" ;;
+    smoke_resume) script_name="bg_run_smoke_resume" ;;
   esac
   local script="${ROOT}/scripts/${script_name}.sh"
   [[ -f "${script}" ]] || { echo "Missing ${script}"; exit 1; }
@@ -99,7 +115,7 @@ cmd_launch() {
 main() {
   local sub="${1:-}"
   case "${sub}" in
-    download_assets|full_pipeline|pipeline_b|train_eval|full_experiment|libero_eval)
+    download_assets|full_pipeline|pipeline_b|train_eval|full_experiment|libero_eval|policy_full|policy_train|libero_compare|export_compare|ablations|paper_all|smoke_all|smoke_resume)
       cmd_launch "${sub}"
       ;;
     status)

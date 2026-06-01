@@ -27,6 +27,12 @@ class FutureLatentHead(nn.Module):
         Returns:
             pred_future_latent: [B, future_latent_dim]
         """
+        try:
+            from ..wrappers.inference_guard import record_auxiliary_head_call
+
+            record_auxiliary_head_call("FutureLatentHead")
+        except ImportError:
+            pass
         if hidden.dim() != 2 or action.dim() != 2:
             raise ValueError(
                 f"Expected hidden/action rank-2, got {hidden.shape} and {action.shape}"

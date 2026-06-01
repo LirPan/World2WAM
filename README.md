@@ -4,8 +4,11 @@ External wrapper project for **FastWAM + LIBERO (LeRobot)** without modifying up
 
 ## What this is
 
-- **Training**: `L_total = L_action + λ_fwd · L_future` (future distillation mode)
-- **Inference**: **action-only** via `FastWAM.infer_action` — no `FutureLatentHead`, no future video
+- **Baseline**: FastWAM **official** checkpoint (`official_fastwam_checkpoint`) — no retraining FastWAM
+- **World2WAM-Probe** (`backbone_mode=frozen`): train `FutureLatentHead` only; analyze hidden → future latent
+- **World2WAM-Policy** (`backbone_mode=lora`): `L_total = L_action + warmup(λ_fwd)·L_future` into action path (LoRA/adapter)
+- **Bidirectional-Analysis**: forward / inverse / cycle on frozen hidden — representation study, **not** the main success path
+- **Inference**: **action-only** via `FastWAM.infer_action` — no auxiliary heads, no future video
 - **Data**: Real FastWAM `RobotVideoDataset` (LIBERO LeRobot), not toy/random data
 
 ## Why we do not edit upstream repos
@@ -180,9 +183,19 @@ Checkpoints: `experiments/bidirectional_world2wam/checkpoints/` (`future_head_fi
 
 Config: `configs/bidirectional_world2wam.yaml` (`lambda_fwd`, `lambda_inv`, `lambda_cycle`, `use_gt_action_for_forward_head`).
 
+## Policy improvement (main success path)
+
+```bash
+bash scripts/02_precompute_future_latents.sh
+bash scripts/07_train_world2wam_policy_improve.sh
+bash scripts/04_eval_action_only.sh --checkpoint experiments/world2wam_policy_improve/checkpoints/world2wam_final.pt
+```
+
+See **[docs/RUN_EXPERIMENTS.md](docs/RUN_EXPERIMENTS.md)** for steps A–F (baseline → probe → policy → bidirectional → eval → LIBERO sim).
+
 ## Next steps
 
-1. Point `lerobot_dataset_dirs` to your LeRobot LIBERO roots
-2. Download Wan + ActionDiT checkpoints per FastWAM README
-3. `02_precompute` → `03_train` or `05_train_bidirectional` → `04_eval` / `06_eval`
-4. Compare LIBERO success vs baseline checkpoint (bidirectional heads alone will not change sim success)
+1. Set `official_fastwam_checkpoint` and `lerobot_dataset_dirs` in configs
+2. Download Wan + ActionDiT + official FastWAM ckpt per FastWAM README
+3. `02_precompute` → `03` (probe) / `07` (policy) / `05` (bidirectional analysis) → `04_eval`
+4. Compare LIBERO success: official ckpt (A) vs `world2wam_final.pt` (E/F)

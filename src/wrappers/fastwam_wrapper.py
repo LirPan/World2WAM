@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Optional
@@ -7,7 +8,12 @@ from typing import Any, Optional
 import torch
 import torch.nn as nn
 
+from ..models.action_expert_adapter import ActionExpertAdapterBank
+from ..utils.checkpoint_utils import count_trainable_params, load_world2wam_checkpoint, resolve_official_checkpoint
+from .backbone_modes import apply_backbone_mode, hidden_should_detach, resolve_backbone_mode, sync_action_expert_to_mot
 from ..utils.import_utils import add_fastwam_path
+
+logger = logging.getLogger(__name__)
 
 
 class FastWAMWrapper(nn.Module):
@@ -22,7 +28,10 @@ class FastWAMWrapper(nn.Module):
         fastwam_root: str | Path | None = None,
         fastwam_task_config: str = "libero_uncond_2cam224_1e-4",
         checkpoint_path: str | Path | None = None,
-        freeze_backbone: bool = False,
+        official_checkpoint: str | Path | None = None,
+        freeze_backbone: bool | None = None,
+        backbone_mode: str | None = None,
+        cfg: dict[str, Any] | None = None,
         device: str = "cuda",
         mixed_precision: str = "bf16",
     ):
@@ -34,6 +43,18 @@ class FastWAMWrapper(nn.Module):
             self.fastwam_root = Path(fastwam_root).resolve()
         else:
             self.fastwam_root = Path(fastwam_config_path).resolve().parents[1]
+
+        self._cfg = cfg or {}
+        if backbone_mode is None:
+            backbone_mode = resolve_backbone_mode(self._cfg)
+        if freeze_backbone is not None and backbone_mode is None:
+            backbone_mode = "frozen" if freeze_backbone else "full"
+
+        self.backbone_mode = str(backbone_mode).lower()
+        self.hidden_detached = hidden_should_detach(self.backbone_mode)
+        self._adapter_bank: ActionExpertAdapterBank | None = None
+        self._uses_future_video = False
+        self._orig_loss_lambda_video: float | None = None
 
         add_fastwam_path(self.fastwam_root)
         os.chdir(self.fastwam_root)
@@ -47,15 +68,23 @@ class FastWAMWrapper(nn.Module):
             device=device,
         )
 
-        if checkpoint_path is not None:
-            ckpt = Path(checkpoint_path)
-            if not ckpt.exists():
-                raise FileNotFoundError(f"Checkpoint not found: {ckpt}")
-            self.model.load_checkpoint(str(ckpt))
+        ckpt = official_checkpoint or checkpoint_path
+        if ckpt is not None:
+            ckpt_path = Path(ckpt)
+            if not ckpt_path.exists():
+                raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+            self.model.load_checkpoint(str(ckpt_path))
+            self._loaded_checkpoint = str(ckpt_path.resolve())
+        else:
+            self._loaded_checkpoint = None
 
-        if freeze_backbone:
-            for p in self.model.parameters():
-                p.requires_grad = False
+        self.model, self._adapter_bank, self.hidden_detached, effective_mode = apply_backbone_mode(
+            self.model, self.backbone_mode, self._cfg
+        )
+        self.backbone_mode = effective_mode
+        self.trainable_param_count = count_trainable_params(self.model)
+        if self._adapter_bank is not None:
+            self.trainable_param_count += count_trainable_params(self._adapter_bank)
 
         self._register_mot_hook()
 
@@ -92,6 +121,61 @@ class FastWAMWrapper(nn.Module):
         if self._hook_handle is not None:
             self._hook_handle.remove()
             self._hook_handle = None
+        if self._adapter_bank is not None:
+            self._adapter_bank.detach()
+
+    @classmethod
+    def from_config(cls, cfg: dict[str, Any], **kwargs: Any) -> "FastWAMWrapper":
+        official = resolve_official_checkpoint(cfg)
+        mode = kwargs.pop("backbone_mode", None) or resolve_backbone_mode(cfg)
+        return cls(
+            fastwam_root=cfg["fastwam_root"],
+            fastwam_task_config=cfg.get("fastwam_task_config", "libero_uncond_2cam224_1e-4"),
+            official_checkpoint=official,
+            backbone_mode=mode,
+            cfg=cfg,
+            device=cfg.get("device", "cuda"),
+            mixed_precision=cfg.get("mixed_precision", "bf16"),
+            **kwargs,
+        )
+
+    def load_world2wam_bundle(self, bundle_path: str | Path) -> None:
+        """Load policy bundle: optional LoRA/adapter + metadata (official ckpt already loaded)."""
+        payload = load_world2wam_checkpoint(Path(bundle_path))
+        extra = payload.get("backbone_extra") or {}
+        mode = str(payload.get("backbone_mode", self.backbone_mode))
+
+        if mode == "lora" and "lora" in extra:
+            from peft import set_peft_model_state_dict
+
+            set_peft_model_state_dict(self.model.action_expert, extra["lora"])
+            sync_action_expert_to_mot(self.model)
+        elif mode == "adapter" and "adapter" in extra and self._adapter_bank is not None:
+            self._adapter_bank.load_state_dict(extra["adapter"])
+        elif mode == "full" and "action_expert" in extra:
+            self.model.action_expert.load_state_dict(extra["action_expert"], strict=False)
+            sync_action_expert_to_mot(self.model)
+
+        self._world2wam_bundle_path = str(Path(bundle_path).resolve())
+
+    def get_backbone_state_for_save(self) -> dict[str, Any]:
+        extra: dict[str, Any] = {}
+        if self._adapter_bank is not None:
+            extra["adapter"] = self._adapter_bank.state_dict_adapter_only()
+        elif self.backbone_mode == "lora":
+            try:
+                from peft.utils import get_peft_model_state_dict
+
+                extra["lora"] = get_peft_model_state_dict(self.model.action_expert)
+            except Exception:
+                extra["lora"] = {
+                    k: v.cpu()
+                    for k, v in self.model.action_expert.state_dict().items()
+                    if "lora" in k.lower()
+                }
+        elif self.backbone_mode == "full":
+            extra["action_expert"] = self.model.action_expert.state_dict()
+        return extra
 
     @property
     def action_dim(self) -> int:
@@ -105,25 +189,38 @@ class FastWAMWrapper(nn.Module):
         self,
         batch: dict[str, Any],
         use_future_latent_distill: bool = False,
+        policy_action_only_loss: bool | None = None,
     ) -> dict[str, Any]:
-        """
-        Run FastWAM training_loss and optionally expose hidden for distillation.
-        """
-        del use_future_latent_distill  # head applied outside wrapper
+        del use_future_latent_distill
         self._captured_action_tokens = None
         train_batch = self._to_fastwam_batch(batch)
 
         if not hasattr(self.model, "training_loss"):
             raise AttributeError("Model does not implement training_loss().")
 
+        use_action_only = policy_action_only_loss
+        if use_action_only is None:
+            use_action_only = bool(self._cfg.get("policy_action_only_loss", True))
+
+        if use_action_only:
+            if self._orig_loss_lambda_video is None:
+                self._orig_loss_lambda_video = float(getattr(self.model, "loss_lambda_video", 1.0))
+            self.model.loss_lambda_video = 0.0
+        elif self._orig_loss_lambda_video is not None:
+            self.model.loss_lambda_video = self._orig_loss_lambda_video
+
         loss_total, loss_dict = self.model.training_loss(train_batch)
 
-        hidden = self.extract_hidden({"action_tokens": self._captured_action_tokens}, batch)
+        if use_action_only:
+            action_loss_tensor = loss_total
+        else:
+            action_loss_tensor = loss_total
+            if "loss_action" in loss_dict and "loss_video" in loss_dict:
+                action_loss_tensor = loss_total
 
-        action_loss_tensor = loss_total
-        if "loss_action" in loss_dict and "loss_video" in loss_dict:
-            # Reconstruct scalar action-only component when both logged
-            action_loss_tensor = loss_total  # caller uses loss_dict for logging
+        hidden = self.extract_hidden({"action_tokens": self._captured_action_tokens}, batch)
+        if self.hidden_detached:
+            hidden = hidden.detach()
 
         return {
             "pred_action": None,
@@ -131,6 +228,8 @@ class FastWAMWrapper(nn.Module):
             "loss_dict": loss_dict,
             "loss_total": loss_total,
             "hidden": hidden,
+            "hidden_detached": self.hidden_detached,
+            "backbone_mode": self.backbone_mode,
             "raw_outputs": {
                 "action_tokens": self._captured_action_tokens,
                 "loss_dict": loss_dict,
@@ -155,7 +254,6 @@ class FastWAMWrapper(nn.Module):
             else:
                 video = video.unsqueeze(1) if video.dim() == 4 else video
 
-        # Current frame as [1,3,H,W]
         frame = video[:, :, 0] if video.dim() == 5 else video[:, 0]
         if frame.dim() == 3:
             frame = frame.unsqueeze(0)
@@ -181,8 +279,12 @@ class FastWAMWrapper(nn.Module):
         }
         if context is not None and context_mask is not None:
             infer_kwargs["prompt"] = None
-            infer_kwargs["context"] = context
-            infer_kwargs["context_mask"] = context_mask
+            infer_kwargs["context"] = context.to(device=self.model.device) if isinstance(context, torch.Tensor) else context
+            infer_kwargs["context_mask"] = (
+                context_mask.to(device=self.model.device)
+                if isinstance(context_mask, torch.Tensor)
+                else context_mask
+            )
         else:
             if not prompt:
                 raise ValueError("forward_action_only needs context/context_mask or prompt in batch.")
@@ -197,9 +299,6 @@ class FastWAMWrapper(nn.Module):
         return {"pred_action": action}
 
     def extract_hidden(self, raw_outputs: dict[str, Any], batch: dict[str, Any]) -> torch.Tensor:
-        """
-        Pool MoT action tokens -> [B, hidden_dim].
-        """
         tokens = raw_outputs.get("action_tokens")
         if tokens is None:
             tokens = self._captured_action_tokens
@@ -229,7 +328,6 @@ class FastWAMWrapper(nn.Module):
         else:
             pooled = tokens.mean(dim=1)
 
-        # If anchor specified and no mask, prefer anchor token
         if mask is None and tokens.shape[1] > anchor:
             pooled = tokens[:, anchor, :]
 
@@ -237,14 +335,11 @@ class FastWAMWrapper(nn.Module):
 
     @torch.no_grad()
     def encode_future_latent(self, future_obs: torch.Tensor, tiled: bool = False) -> torch.Tensor:
-        """
-        Encode future RGB clip with FastWAM VAE; mean-pool to vector [B, C_lat].
-        future_obs: [B,3,T,H,W] or [B,3,H,W]
-        """
+        self._uses_future_video = True
         if not hasattr(self.model, "vae"):
             raise AttributeError(
                 "FastWAM model has no `vae`. Cannot encode future_latent. "
-                "TODO: confirm Wan weights loaded."
+                "Confirm Wan weights are loaded under FastWAM/checkpoints/."
             )
         x = future_obs
         if x.dim() == 4:
@@ -253,11 +348,9 @@ class FastWAMWrapper(nn.Module):
             raise ValueError(f"future_obs must have channel dim 3, got {x.shape}")
         x = x.to(device=self.model.device, dtype=self.model.torch_dtype)
         z = self.model._encode_video_latents(x, tiled=tiled)
-        # z: [B, C, T', H', W']
         return z.float().mean(dim=(2, 3, 4))
 
     def _to_fastwam_batch(self, batch: dict[str, Any]) -> dict[str, Any]:
-        """Ensure batch keys match FastWAM training_loss expectations."""
         out = {}
         for key in (
             "video",
@@ -271,7 +364,11 @@ class FastWAMWrapper(nn.Module):
             "proprio_is_pad",
         ):
             if key in batch:
-                out[key] = batch[key]
+                val = batch[key]
+                if isinstance(val, torch.Tensor) and key in ("context", "context_mask", "video", "action", "proprio"):
+                    out[key] = val.to(device=self.model.device)
+                else:
+                    out[key] = val
         if "language" in batch and "prompt" not in out:
             out["prompt"] = batch["language"]
         missing = [k for k in ("video", "action", "context", "context_mask") if k not in out]

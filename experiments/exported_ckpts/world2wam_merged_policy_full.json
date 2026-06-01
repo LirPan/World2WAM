@@ -1,0 +1,11 @@
+{
+  "merged_checkpoint": "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/exported_ckpts/world2wam_merged_policy_full.pt",
+  "bundle_source": "/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/world2wam_policy_improve_full/checkpoints/world2wam_final.pt",
+  "official_checkpoint": "/DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt",
+  "backbone_mode": "lora",
+  "export_time": "2026-05-29T11:54:07.517430+00:00",
+  "meta": {
+    "global_step": 39921,
+    "experiment_role": "policy"
+  }
+}

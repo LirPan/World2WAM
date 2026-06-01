@@ -140,9 +140,13 @@ def compute_total_loss(
     use_future_latent_distill: bool,
     lambda_fwd: float,
     batch: dict[str, Any],
+    current_lambda_fwd: float | None = None,
 ) -> tuple[torch.Tensor, dict[str, float]]:
+    lam = float(lambda_fwd if current_lambda_fwd is None else current_lambda_fwd)
     metrics: dict[str, float] = {"loss_action": float(action_loss.detach().item())}
     if not use_future_latent_distill:
+        metrics["loss_total"] = metrics["loss_action"]
+        metrics["current_lambda_fwd"] = lam
         return action_loss, metrics
 
     fl = batch.get("future_latent")
@@ -151,10 +155,38 @@ def compute_total_loss(
     if future_loss is None:
         raise ValueError("future_loss is None but use_future_latent_distill=True")
 
-    total = action_loss + lambda_fwd * future_loss
+    total = action_loss + lam * future_loss
     metrics["loss_future"] = float(future_loss.detach().item())
     metrics["loss_total"] = float(total.detach().item())
+    metrics["current_lambda_fwd"] = lam
     return total, metrics
+
+
+def build_policy_distill_metrics(
+    *,
+    backbone_mode: str,
+    trainable_param_count: int,
+    hidden_detached: bool,
+    loss_action: float,
+    loss_future: float,
+    current_lambda_fwd: float,
+    loss_total: float,
+    experiment_role: str,
+    global_step: int,
+    epoch: int,
+) -> dict[str, float | int | str | bool]:
+    return {
+        "backbone_mode": backbone_mode,
+        "trainable_param_count": int(trainable_param_count),
+        "hidden_detached": bool(hidden_detached),
+        "loss_action": float(loss_action),
+        "loss_future": float(loss_future),
+        "current_lambda_fwd": float(current_lambda_fwd),
+        "loss_total": float(loss_total),
+        "experiment_role": experiment_role,
+        "global_step": int(global_step),
+        "epoch": int(epoch),
+    }
 
 
 def _infer_device(batch: dict[str, Any]) -> torch.device:

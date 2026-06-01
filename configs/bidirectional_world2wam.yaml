@@ -3,13 +3,16 @@ fastwam_root: ../code/FastWAM
 libero_root: ../code/LIBERO
 fastwam_task_config: libero_uncond_2cam224_1e-4
 
+experiment_role: bidirectional_analysis
+official_fastwam_checkpoint: ../code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt
+backbone_mode: frozen
+freeze_fastwam_backbone: true
+
 dataset_suite: libero_spatial
 future_horizon: 1
 future_latent_dim: 48
 hidden_dim: 1024
 action_dim: null
-
-freeze_fastwam_backbone: true
 
 use_gt_action_for_forward_head: true
 use_target_future_for_inverse_head: true
@@ -26,11 +29,10 @@ num_workers: 4
 device: cuda
 
 lerobot_dataset_dirs:
-  - /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/data/libero_mujoco3.3.2/libero_spatial_no_noops_lerobot
+  - ../code/FastWAM/data/libero_mujoco3.3.2/libero_spatial_no_noops_lerobot
 cache_dir: ./data/future_latents
 output_dir: ./experiments/bidirectional_world2wam
-checkpoint_path: /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt
-dataset_stats_path: /DATA/disk1/yjh_space/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+dataset_stats_path: ../code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
 future_head_checkpoint: null
 inverse_head_checkpoint: null
 

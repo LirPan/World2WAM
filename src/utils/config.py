@@ -5,6 +5,7 @@ from typing import Any
 
 import yaml
 
+from .checkpoint_utils import normalize_config
 from .path_utils import minimal_project_root, resolve_path
 
 
@@ -16,8 +17,4 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
         cfg = yaml.safe_load(f)
     if cfg is None:
         raise ValueError(f"Empty config: {path}")
-    root = minimal_project_root()
-    for key in ("fastwam_root", "libero_root", "cache_dir", "output_dir"):
-        if key in cfg and cfg[key] is not None:
-            cfg[key] = str(resolve_path(cfg[key], root))
-    return cfg
+    return normalize_config(cfg)

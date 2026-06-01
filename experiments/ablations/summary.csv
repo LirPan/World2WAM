@@ -1,0 +1,13 @@
+run_name,mode,lambda_cycle,future_horizon,forward_mse,inverse_action_mse,cycle_action_mse,forward_cosine,num_batches,output_dir
+bidirectional_lc0.1_h1,bidirectional,0.1,1,0.002896868553943932,0.058331443648785355,0.05835493016056716,0.9735106706619263,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/bidirectional_lc0.1_h1
+bidirectional_lc0.5_h1,bidirectional,0.5,1,0.002049516624538228,0.036134577449411155,0.03626216778066009,0.9801400452852249,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/bidirectional_lc0.5_h1
+bidirectional_lc0_h1,bidirectional,0,1,0.002049516624538228,0.036134577449411155,0.03626216778066009,0.9801400452852249,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/bidirectional_lc0_h1
+bidirectional_lc1.0_h1,bidirectional,1.0,1,0.002049516624538228,0.036134577449411155,0.03626216778066009,0.9801400452852249,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/bidirectional_lc1.0_h1
+cycle_lc0.1_h1,cycle,0.1,1,0.0028964458615519106,0.058342319540679456,0.058345724502578376,0.9735008209943772,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/cycle_lc0.1_h1
+cycle_lc0.5_h1,cycle,0.5,1,0.002125587669434026,0.03614816118497401,0.03620491758920252,0.9794241219758988,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/cycle_lc0.5_h1
+cycle_lc0_h1,cycle,0,1,0.002049516624538228,0.036134577449411155,0.03626216778066009,0.9801400452852249,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/cycle_lc0_h1
+cycle_lc1.0_h1,cycle,1.0,1,0.002247378998436034,0.03618857571855187,0.036176755419000985,0.9782813668251038,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/cycle_lc1.0_h1
+forward_only_lc0.1_h1,forward_only,0.1,1,0.0029793058289214968,,,0.9732982248067856,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/forward_only_lc0.1_h1
+forward_only_lc0.5_h1,forward_only,0.5,1,0.0017494295607320964,,,0.9840147197246552,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/forward_only_lc0.5_h1
+forward_only_lc0_h1,forward_only,0,1,0.0017494295607320964,,,0.9840147197246552,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/forward_only_lc0_h1
+forward_only_lc1.0_h1,forward_only,1.0,1,0.0017494295607320964,,,0.9840147197246552,20,/DATA/disk1/yjh_space/idea2_workspace/minimal_world2wam/experiments/ablations/forward_only_lc1.0_h1

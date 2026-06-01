@@ -3,20 +3,36 @@ fastwam_root: ../code/FastWAM
 libero_root: ../code/LIBERO
 fastwam_task_config: libero_uncond_2cam224_1e-4
 
+experiment_role: probe
+official_fastwam_checkpoint: ../code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt
+backbone_mode: frozen
+
 use_future_latent_distill: true
 lambda_fwd: 0.1
+future_loss_warmup_steps: 1000
 future_horizon: 1
 future_latent_dim: 48
 hidden_dim: 1024
 action_dim: 7
 
 use_gt_action_for_future_head: true
+train_future_head: true
 freeze_fastwam_backbone: true
-anchor_action_idx: 0
+policy_action_only_loss: true
+
+lora_rank: 8
+lora_alpha: 16
+lora_target_modules:
+  - q
+  - k
+  - v
+  - o
+adapter_hidden_dim: 256
 
 batch_size: 16
 num_epochs: 5
 lr: 1.0e-4
+backbone_lr: 5.0e-5
 seed: 42
 num_workers: 4
 device: cuda
@@ -24,9 +40,11 @@ device: cuda
 lerobot_dataset_dirs: null
 cache_dir: ./data/future_latents
 output_dir: ./experiments/future_latent_distill
-checkpoint_path: null
+dataset_stats_path: ../code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
 future_head_checkpoint: null
 
 mixed_precision: bf16
 log_every: 10
 save_every: 500
+max_train_steps: null
+precompute_max_samples: 128

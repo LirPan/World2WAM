@@ -28,9 +28,16 @@ from src.losses.world2wam_losses import (
 )
 from src.models.future_latent_head import FutureLatentHead
 from src.models.inverse_action_head import InverseActionHead
+from src.utils.checkpoint_utils import (
+    normalize_config,
+    resolve_official_checkpoint,
+    save_resolved_config,
+    verify_future_latent_cache,
+)
 from src.utils.config import load_config
 from src.utils.path_utils import minimal_project_root, resolve_path
 from src.utils.seed import set_seed
+from src.wrappers.backbone_modes import resolve_backbone_mode
 from src.wrappers.fastwam_wrapper import FastWAMWrapper
 
 logging.basicConfig(level=logging.INFO)
@@ -91,29 +98,35 @@ def build_dataloader(cfg: dict) -> DataLoader:
     )
 
 
-def train_bidirectional(cfg: dict, mode: str) -> None:
+def train_bidirectional(cfg: dict, mode: str, args: argparse.Namespace) -> None:
     if mode not in ("forward_only", "bidirectional", "cycle"):
         raise ValueError(f"Unknown mode: {mode}")
+
+    cfg = normalize_config(cfg)
+    backbone_mode = args.backbone_mode or resolve_backbone_mode(cfg)
+    official_ckpt = resolve_official_checkpoint(cfg)
 
     out_dir = Path(cfg["output_dir"])
     log_dir = out_dir / "logs"
     ckpt_dir = out_dir / "checkpoints"
     log_dir.mkdir(parents=True, exist_ok=True)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
+    save_resolved_config({**cfg, "backbone_mode": backbone_mode, "mode": mode}, out_dir)
+
+    verify_future_latent_cache(cfg)
+
+    logger.info(
+        "Bidirectional World2WAM — representation analysis only; "
+        "does not guarantee LIBERO success improvement."
+    )
+    logger.info("official_ckpt=%s backbone_mode=%s mode=%s", official_ckpt, backbone_mode, mode)
 
     device = cfg.get("device", "cuda")
     if device == "cuda" and not torch.cuda.is_available():
         logger.warning("CUDA unavailable; falling back to CPU.")
         device = "cpu"
 
-    wrapper = FastWAMWrapper(
-        fastwam_root=cfg["fastwam_root"],
-        fastwam_task_config=cfg.get("fastwam_task_config", "libero_uncond_2cam224_1e-4"),
-        checkpoint_path=cfg.get("checkpoint_path"),
-        freeze_backbone=bool(cfg.get("freeze_fastwam_backbone", True)),
-        device=device,
-        mixed_precision=cfg.get("mixed_precision", "bf16"),
-    )
+    wrapper = FastWAMWrapper.from_config(cfg, backbone_mode=backbone_mode)
 
     loader = build_dataloader(cfg)
 
@@ -142,11 +155,18 @@ def train_bidirectional(cfg: dict, mode: str) -> None:
             torch.load(cfg["inverse_head_checkpoint"], map_location=device, weights_only=True)
         )
 
-    if mode == "forward_only":
-        optim_params = future_head.parameters()
-    else:
-        assert inverse_head is not None
-        optim_params = chain(future_head.parameters(), inverse_head.parameters())
+    optim_params = list(future_head.parameters())
+    if inverse_head is not None:
+        optim_params = list(chain(optim_params, inverse_head.parameters()))
+    if backbone_mode != "frozen":
+        optim_params = list(
+            chain(
+                optim_params,
+                [p for p in wrapper.model.parameters() if p.requires_grad],
+            )
+        )
+        if wrapper._adapter_bank is not None:
+            optim_params = list(chain(optim_params, wrapper._adapter_bank.parameters()))
 
     optim = torch.optim.AdamW(optim_params, lr=float(cfg["lr"]), weight_decay=1e-4)
 
@@ -189,7 +209,10 @@ def train_bidirectional(cfg: dict, mode: str) -> None:
                 logger.info("Inferred action_dim=%d from first batch", action_dim)
                 action_dim_logged = True
 
-            with torch.no_grad():
+            if backbone_mode == "frozen":
+                with torch.no_grad():
+                    fw_out = wrapper.forward_train(batch, use_future_latent_distill=True)
+            else:
                 fw_out = wrapper.forward_train(batch, use_future_latent_distill=True)
             hidden = fw_out["hidden"]
 
@@ -243,6 +266,9 @@ def train_bidirectional(cfg: dict, mode: str) -> None:
 
             global_step += 1
             metrics = {
+                "experiment_role": "bidirectional_analysis",
+                "backbone_mode": backbone_mode,
+                "hidden_detached": bool(fw_out.get("hidden_detached", backbone_mode == "frozen")),
                 "loss_fwd": float(loss_dict["loss_fwd"].detach().item()),
                 "loss_inv": float(loss_dict["loss_inv"].detach().item()),
                 "loss_cycle": float(loss_dict["loss_cycle"].detach().item()),
@@ -262,9 +288,11 @@ def train_bidirectional(cfg: dict, mode: str) -> None:
                     {k: f"{v:.4f}" for k, v in metrics.items() if k.startswith("loss")}
                 )
                 logger.info(
-                    "step=%d mode=%s loss_fwd=%.4f loss_inv=%.4f loss_cycle=%.4f "
-                    "loss_train_backward=%.4f loss_action_monitor=%.4f lr=%.2e bs=%d cache=%s",
+                    "step=%d role=bidirectional_analysis backbone_mode=%s mode=%s "
+                    "loss_fwd=%.4f loss_inv=%.4f loss_cycle=%.4f "
+                    "loss_train_backward=%.4f loss_action_monitor=%.4f lr=%.2e bs=%d",
                     global_step,
+                    backbone_mode,
                     mode,
                     metrics["loss_fwd"],
                     metrics["loss_inv"],
@@ -273,7 +301,6 @@ def train_bidirectional(cfg: dict, mode: str) -> None:
                     metrics["loss_action_monitor"],
                     metrics["lr"],
                     metrics["batch_size"],
-                    metrics["from_cache"],
                 )
 
             if global_step % save_every == 0:
@@ -306,6 +333,7 @@ def main() -> None:
         choices=["forward_only", "bidirectional", "cycle"],
         required=True,
     )
+    parser.add_argument("--backbone-mode", type=str, default=None, choices=["frozen", "lora", "adapter", "full"])
     parser.add_argument("--fastwam-root", type=str, default=None)
     parser.add_argument("--libero-root", type=str, default=None)
     args = parser.parse_args()
@@ -317,7 +345,7 @@ def main() -> None:
         cfg["libero_root"] = str(resolve_path(args.libero_root, minimal_project_root()))
 
     set_seed(int(cfg.get("seed", 42)))
-    train_bidirectional(cfg, args.mode)
+    train_bidirectional(cfg, args.mode, args)
 
 
 if __name__ == "__main__":

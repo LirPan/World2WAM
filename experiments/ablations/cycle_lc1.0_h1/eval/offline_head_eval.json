@@ -1,0 +1,10 @@
+{
+  "forward_mse": 0.002247378998436034,
+  "forward_cosine": 0.9782813668251038,
+  "num_batches": 20,
+  "inverse_action_mse": 0.03618857571855187,
+  "cycle_action_mse": 0.036176755419000985,
+  "experiment_role": "bidirectional_analysis",
+  "eval_type": "offline_head_mse_only",
+  "note": "Representation analysis only; does not use infer_action or guarantee LIBERO success improvement."
+}

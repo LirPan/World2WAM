@@ -48,6 +48,7 @@ pip install \
   "numpy==1.26.4" "omegaconf==2.3.0" "packaging==25.0" "pandas==2.2.3" "pillow>=12.0.0" \
   "pyarrow==23.0.0" "regex==2025.11.3" "rich==14.2.0" "safetensors==0.5.3" \
   "termcolor==2.5.0" "torchcodec==0.5" "tqdm==4.66.5" "transformers==4.49.0" \
+  "peft>=0.10.0" "future" "matplotlib" \
   "wandb==0.23.1" h5py pyyaml --default-timeout=300
 
 # Optional: LIBERO for sim eval only (not required for LeRobot pipeline)

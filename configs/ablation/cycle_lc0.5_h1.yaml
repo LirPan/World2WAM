@@ -1,0 +1,35 @@
+project_name: world2wam_minimal
+fastwam_root: ../code/FastWAM
+libero_root: ../code/LIBERO
+fastwam_task_config: libero_uncond_2cam224_1e-4
+experiment_role: bidirectional_analysis
+official_fastwam_checkpoint: ../code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt
+backbone_mode: frozen
+freeze_fastwam_backbone: true
+future_horizon: 1
+future_latent_dim: 48
+hidden_dim: 1024
+action_dim: null
+use_gt_action_for_forward_head: true
+use_target_future_for_inverse_head: true
+lambda_fwd: 1.0
+lambda_inv: 1.0
+lambda_cycle: 0.5
+batch_size: 4
+num_epochs: 1
+lr: 1.0e-4
+seed: 42
+num_workers: 4
+device: cpu
+lerobot_dataset_dirs:
+  - ../code/FastWAM/data/libero_mujoco3.3.2/libero_spatial_no_noops_lerobot
+cache_dir: ./data/future_latents
+output_dir: ./experiments/ablations/cycle_lc0.5_h1
+dataset_stats_path: ../code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+mixed_precision: bf16
+log_every: 10
+save_every: 500
+precompute_max_samples: 0
+max_train_steps: 500
+inverse_hidden_size: 1024
+inverse_dropout: 0.0
