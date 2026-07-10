@@ -1,9 +1,47 @@
-data/future_latents/
-experiments/*/checkpoints/
-experiments/bg_jobs/
-experiments/libero_eval/
-experiments/future_latent_distill_full/logs/
+# Python
 __pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Checkpoints & large artifacts (never commit weights)
 *.pt
 *.pth
+*.safetensors
+*.ckpt
+*.bin
+
+# Data & cache (local only)
+cache/
+data/future_latents/
+artifacts/
+version_b/artifacts/
+
+# Experiment outputs
+experiments/*/checkpoints/
+experiments/bg_jobs/
+experiments/world2wam_*/
+experiments/*.json
+!experiments/.gitkeep
+
+# Logs
+*.log
+nohup.out
+
+# Env & secrets
 .env
+.env.*
+proxy/proxy.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Conda lock noise (keep world2wam_env.yaml as reference)
+# miniconda3/

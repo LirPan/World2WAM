@@ -1,0 +1,52 @@
+project_name: physics_world2wam_version_b
+fastwam_root: ../../plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM
+libero_root: ../../plr/yjh_space_backup_20250602/idea2_workspace/code/LIBERO
+fastwam_task_config: libero_uncond_2cam224_1e-4
+
+official_fastwam_checkpoint: ../../plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt
+dataset_stats_path: ../../plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+
+backbone_mode: frozen
+enable_physics: false
+
+future_horizon: 1
+future_latent_dim: 48
+hidden_dim: 1024
+action_dim: null
+action_horizon: 10
+anchor_action_idx: 0
+text_dim: 4096
+proprio_dim: 9
+
+flow_hidden_dim: 256
+flow_depth: 4
+flow_num_heads: 8
+
+lambda_fastwam_action: 0.0
+lambda_fastwam_video: 0.0
+lambda_fwd: 1.0
+lambda_flow: 1.0
+lambda_inverse: 0.1
+lambda_cycle: 0.1
+lambda_phase: 0.1
+lambda_phy: 0.1
+
+cycle_detach_forward: true
+
+physics:
+  num_phases: 8
+  physics_dim: 128
+
+batch_size: 4
+num_epochs: 1
+lr: 1.0e-4
+seed: 42
+num_workers: 0
+device: cuda
+mixed_precision: bf16
+
+cache_dir: ./artifacts/latent_cache
+output_dir: ./artifacts/checkpoints/version_b
+log_every: 10
+save_every: 500
+max_train_steps: null

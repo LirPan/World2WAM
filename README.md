@@ -1,201 +1,79 @@
-# World2WAM Minimal — Imagination-Distilled Fast-WAM
+# Physics-Aligned World2WAM
 
-External wrapper project for **FastWAM + LIBERO (LeRobot)** without modifying upstream repositories.
+**Learn the world with physics, generate actions with diffusion.**
 
-## What this is
+Version A architecture: decouple world understanding from action generation on frozen FastWAM pooled latents.
 
-- **Baseline**: FastWAM **official** checkpoint (`official_fastwam_checkpoint`) — no retraining FastWAM
-- **World2WAM-Probe** (`backbone_mode=frozen`): train `FutureLatentHead` only; analyze hidden → future latent
-- **World2WAM-Policy** (`backbone_mode=lora`): `L_total = L_action + warmup(λ_fwd)·L_future` into action path (LoRA/adapter)
-- **Bidirectional-Analysis**: forward / inverse / cycle on frozen hidden — representation study, **not** the main success path
-- **Inference**: **action-only** via `FastWAM.infer_action` — no auxiliary heads, no future video
-- **Data**: Real FastWAM `RobotVideoDataset` (LIBERO LeRobot), not toy/random data
+## Architecture
 
-## Why we do not edit upstream repos
+- **Future World Head** (`ForwardHead`): `z_t + action + text + physics → z_hat_future`
+- **Action Flow DiT** (`FlowActionDiT`): main decoder — `z_t + text + physics → action` (no future latent)
+- **Inverse / Cycle**: shared `FlowActionDiT` with `future_latent` token (train only)
+- **TeacherPhysicsLabeler**: rule-based phase pseudo-labels (train only)
+- **StudentPhysicsRouter**: `z_t + text + state_t → physics_code` (train + infer)
 
-All logic lives under `idea2_workspace/minimal_world2wam/`. FastWAM / LIBERO / World2VLM / giga-world-policy are **read-only** references, imported via `sys.path`.
+## Train scripts
 
-## Dependencies
+| Script | Stage |
+|--------|-------|
+| `train/train_world2wam_heads.py` | Stage 1: ForwardHead |
+| `train/train_action_flow_dit.py` | Stage 2: FlowActionDiT + forward/inverse/cycle |
+| `train/train_physics_world2wam.py` | Physics-aligned full model |
 
-```bash
-cd idea2_workspace/minimal_world2wam
-bash scripts/setup_conda_env.sh   # creates conda env `world2wam`
-conda activate world2wam
-```
+`train/train_world2wam_adapter.py` is a backward-compatible wrapper for Stage 2.
 
-Full experiment workflow: **[docs/RUN_EXPERIMENTS.md](docs/RUN_EXPERIMENTS.md)**
+## Configs
 
-Quick framework test:
+| Config | Purpose |
+|--------|---------|
+| `configs/world2wam_libero_spatial_h10_paper.yaml` | Stage 1 paper baseline |
+| `configs/world2wam_libero_spatial_h10_flow_dit.yaml` | Stage 2 FlowDiT |
+| `configs/world2wam_physics_flow_dit_main.yaml` | **Main experiment** (Physics + FlowDiT) |
+| `configs/world2wam_libero_spatial_h10_physics_v1.yaml` | Ablation: MLP adapter + physics |
+| `configs/world2wam_libero_spatial_h10_dit.yaml` | Ablation: LightActionDiT |
 
-```bash
-conda activate world2wam
-bash scripts/smoke_test_framework.sh
-```
+## Eval
 
-**Long jobs (survive closing Cursor)** — run on server in background:
+- Offline: `eval/eval_offline_cache_only.py`
+- LIBERO sim: `eval/eval_libero_world2wam.py` (`baseline`, `ours_onestep_*`, `ours_onestep_physics_flow_dit`, residual modes)
 
-```bash
-cd minimal_world2wam
-bash scripts/bg_launch.sh full_pipeline   # download + 02/03/04
-bash scripts/bg_launch.sh status          # check progress
-bash scripts/bg_launch.sh tail full_pipeline
-```
+## Docs
 
-Logs: `experiments/bg_jobs/full_pipeline.log`
+- [docs/final_architecture_audit.md](docs/final_architecture_audit.md) — gap analysis and module map
+- [docs/gpt_handoff_world2wam_full_status.md](docs/gpt_handoff_world2wam_full_status.md) — historical status
 
-Paths in configs (relative to this directory):
+## Symlink
 
-- `fastwam_root: ../code/FastWAM`
-- `libero_root: ../code/LIBERO`
+`minimal_world2wam` → `Physics-Aligned World2WAM` at workspace root for import compatibility.
 
-## Modules
+## Version B (MoT stack)
 
-| Module | Role |
-|--------|------|
-| `src/wrappers/fastwam_wrapper.py` | `FastWAM` + MoT hook for hidden |
-| `src/models/future_latent_head.py` | MLP: hidden + action → future latent |
-| `src/data/libero_dataset_adapter.py` | LeRobot dataset + `future_obs` / cache |
-| `src/data/future_latent_cache.py` | Disk cache for VAE targets |
-| `src/losses/world2wam_losses.py` | Action + future + total loss |
-| `src/train/train_fastwam_future_distill.py` | `--mode baseline` / `future_distill` |
-| `src/train/train_bidirectional_world2wam.py` | `--mode forward_only` / `bidirectional` / `cycle` |
-| `src/models/inverse_action_head.py` | MLP: hidden + future_latent → action |
-| `src/eval/eval_action_only_fastwam.py` | Action-only metrics |
-| `src/eval/eval_bidirectional_heads.py` | Offline forward / inverse / cycle MSE |
+Full FastWAM MoT + physics routing on action tokens. Code under [`version_b/`](version_b/).
 
-## Run code scan
+| Script | Purpose |
+|--------|---------|
+| `version_b/scripts/01_precompute_future_latents.py` | Precompute current + future VAE latents |
+| `version_b/scripts/train_physics_mot.py` | Physics-aligned MoT training |
+| `version_b/scripts/train_bidirectional.py` | Bidirectional MoT baseline (no physics) |
+| `version_b/scripts/poll_gpu_version_b.sh` | GPU polling launcher |
+
+See [version_b/README.md](version_b/README.md).
+
+## Background jobs (GPU poll)
 
 ```bash
-bash scripts/00_scan_fastwam.sh
-# Full report: notes/code_scan_report.md
+# Version A full pipeline (precompute → train → LIBERO eval)
+bash scripts/poll_gpu_version_a.sh start
+bash scripts/poll_gpu_version_a.sh status
+
+# Version B
+bash version_b/scripts/poll_gpu_version_b.sh start
 ```
 
-## Precompute future latents
+## External dependencies (not in repo)
 
-Requires FastWAM Wan VAE weights loaded.
+- FastWAM official checkpoint + Wan VAE weights (~62 GB)
+- LIBERO spatial LeRobot dataset
+- Precomputed latent cache (`cache/libero_spatial_h10_full_fastwam/`)
 
-```bash
-bash scripts/02_precompute_future_latents.sh
-# Optional: --max-samples 100
-```
-
-Caches under `data/future_latents/` (config: `cache_dir`).
-
-If VAE is unavailable, the script **errors** with instructions — no random placeholders.
-
-## Train baseline
-
-**Full FastWAM training** (recommended, unchanged upstream):
-
-```bash
-bash scripts/01_run_fastwam_baseline.sh
-```
-
-This delegates to `FastWAM/scripts/train_zero1.sh`.
-
-**Sanity forward only** (one batch):
-
-```bash
-python src/train/train_fastwam_future_distill.py \
-  --config configs/fastwam_libero_baseline.yaml \
-  --mode baseline
-```
-
-## Train future distillation
-
-1. Run precompute (above)
-2. Train head:
-
-```bash
-bash scripts/03_train_future_distill.sh
-```
-
-Outputs:
-
-- `experiments/future_latent_distill/checkpoints/future_head_final.pt`
-- `experiments/future_latent_distill/logs/`
-
-## Action-only eval
-
-```bash
-bash scripts/04_eval_action_only.sh --max-batches 5
-# With checkpoint:
-bash scripts/04_eval_action_only.sh --checkpoint /path/to/fastwam.ckpt
-```
-
-Writes `experiments/future_latent_distill/eval_results.json` with:
-
-- `future_head_called: false`
-- `avg_latency_ms`
-- `offline_action_mse` (when available)
-
-LIBERO sim success rate: use FastWAM `experiments/libero/eval_libero_single.py` with the same checkpoint (documented in eval JSON when `--run-libero-sim`).
-
-## Config highlights
-
-`configs/fastwam_future_distill.yaml`:
-
-- `hidden_dim: 1024`, `action_dim: 7`, `future_latent_dim: 48`
-- `lambda_fwd: 0.1`, `future_horizon: 1`
-- `use_gt_action_for_future_head: true`
-- `lerobot_dataset_dirs: null` → use FastWAM default paths (override if needed)
-
-## Interfaces still to confirm
-
-| Item | Where to look |
-|------|----------------|
-| FastWAM model | `code/FastWAM/src/fastwam/models/wan22/fastwam.py` |
-| Hidden (train) | MoT output `action` tokens → pool in wrapper |
-| Visual encoder | `model.vae.encode` / `_encode_video_latents` |
-| LIBERO batch fields | `video`, `action`, `context`, `context_mask` |
-| Action inference | `model.infer_action` |
-
-See `notes/implementation_plan.md` and `notes/code_scan_report.md`.
-
-## Bidirectional World-Action Distillation
-
-Three auxiliary objectives on **frozen** FastWAM hidden states (train only):
-
-| Path | Mapping |
-|------|---------|
-| **Forward** | `hidden + action → future_latent` (`FutureLatentHead`) |
-| **Inverse** | `hidden + future_latent → action` (`InverseActionHead`) |
-| **Cycle** | `hidden + action → pred_future_latent → reconstructed_action` |
-
-**Loss (trainable heads only):**
-
-`loss_train_backward = λ_fwd·L_fwd + λ_inv·L_inv + λ_cycle·L_cycle`
-
-`L_action` from FastWAM is logged as `loss_action_monitor` but does not backprop into the frozen backbone.
-
-**Inference** remains **action-only** (`infer_action`) — neither auxiliary head is called.
-
-```bash
-# Requires 02_precompute (same cache: cache_dir + project_name world2wam_minimal)
-bash scripts/05_train_bidirectional_world2wam_smoke.sh   # quick sanity
-bash scripts/05_train_bidirectional_world2wam.sh         # --mode cycle
-
-bash scripts/06_eval_bidirectional_heads.sh
-bash scripts/04_eval_action_only.sh   # future_head_called & inverse_head_called: false
-```
-
-Checkpoints: `experiments/bidirectional_world2wam/checkpoints/` (`future_head_final.pt`, `inverse_head_final.pt`, `bidirectional_heads_final.pt`).
-
-Config: `configs/bidirectional_world2wam.yaml` (`lambda_fwd`, `lambda_inv`, `lambda_cycle`, `use_gt_action_for_forward_head`).
-
-## Policy improvement (main success path)
-
-```bash
-bash scripts/02_precompute_future_latents.sh
-bash scripts/07_train_world2wam_policy_improve.sh
-bash scripts/04_eval_action_only.sh --checkpoint experiments/world2wam_policy_improve/checkpoints/world2wam_final.pt
-```
-
-See **[docs/RUN_EXPERIMENTS.md](docs/RUN_EXPERIMENTS.md)** for steps A–F (baseline → probe → policy → bidirectional → eval → LIBERO sim).
-
-## Next steps
-
-1. Set `official_fastwam_checkpoint` and `lerobot_dataset_dirs` in configs
-2. Download Wan + ActionDiT + official FastWAM ckpt per FastWAM README
-3. `02_precompute` → `03` (probe) / `07` (policy) / `05` (bidirectional analysis) → `04_eval`
-4. Compare LIBERO success: official ckpt (A) vs `world2wam_final.pt` (E/F)
+See `scripts/setup_deps.sh` and `scripts/migrate_to_remote.sh` for deployment.

@@ -1,0 +1,6 @@
+defaults:
+  - default.yaml
+
+enable_physics: false
+lambda_fastwam_video: 0.0
+output_dir: ./artifacts/checkpoints/bidirectional_mot_vb

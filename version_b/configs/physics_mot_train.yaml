@@ -1,0 +1,20 @@
+defaults:
+  - default.yaml
+
+enable_physics: true
+
+lambda_fastwam_action: 0.0
+lambda_fastwam_video: 0.0
+lambda_fwd: 1.0
+lambda_flow: 1.0
+lambda_inverse: 0.1
+lambda_cycle: 0.1
+lambda_phase: 0.1
+lambda_phy: 0.1
+
+output_dir: ./artifacts/checkpoints/physics_mot_vb
+
+physics:
+  num_phases: 8
+  physics_dim: 128
+  phase_label_version: v1

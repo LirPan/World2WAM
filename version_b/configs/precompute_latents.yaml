@@ -1,0 +1,5 @@
+defaults:
+  - default.yaml
+
+cache_dir: ./artifacts/latent_cache
+precompute_max_samples: null

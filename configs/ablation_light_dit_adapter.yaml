@@ -1,0 +1,60 @@
+project: World2WAM
+suite: libero_spatial
+horizon: 10
+
+fastwam:
+  root: /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM
+  checkpoint: checkpoints/fastwam_release/libero_uncond_2cam224.pt
+  dataset_stats: checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+  task_config: libero_uncond_2cam224_1e-4
+  freeze: true
+  mixed_precision: bf16
+  device: cuda
+
+libero:
+  root: /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/code/LIBERO_fresh
+  dataset_dir: data/libero_mujoco3.3.2/libero_spatial_no_noops_lerobot
+
+cache:
+  output_dir: cache/libero_spatial_h10_full_fastwam
+  max_samples: 600000
+
+model:
+  latent_dim: 48
+  text_dim: 512
+  action_dim: 7
+  forward_head:
+    hidden_dim: 1024
+    num_layers: 3
+  action_adapter:
+    adapter_type: light_dit
+    hidden_dim: 512
+    num_layers: 4
+    num_heads: 8
+    dropout: 0.1
+
+train:
+  batch_size: 128
+  lr: 1.0e-4
+  epochs: 10
+  val_ratio: 0.05
+  num_workers: 8
+  log_every: 100
+  output_dir: experiments/world2wam_adapter_light_dit_ablation
+  seed: 42
+
+adapter:
+  output_dir: experiments/world2wam_adapter_light_dit_ablation
+
+loss:
+  use_act: true
+  use_fwd: true
+  use_inv: false
+  use_cycle: false
+
+weights:
+  lambda_act: 1.0
+  lambda_fwd: 1.0
+
+eval:
+  flow_sample_steps: 10
