@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "updated_at": "2026-07-28T03:57:14.860807+00:00",
+  "baseline_reference": {
+    "overall_successes": 481,
+    "overall_total": 500,
+    "hard_successes": 234,
+    "hard_total": 250
+  },
+  "results": {
+    "B1_action_balanced": {
+      "hard_successes": 244,
+      "hard_total": 250,
+      "hard_sr": 0.976,
+      "overall_successes": 486,
+      "overall_total": 500,
+      "overall_sr": 0.972,
+      "hard_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b1_action_balanced_s42_hard_5x50.json",
+      "full_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b1_action_balanced_s42_full_10x50.json",
+      "checkpoint_sha256": "a5183d8fee6f23514d715053a1693d3e298cd4249a484485934ce94b2291c6ea"
+    },
+    "B2_forward": {
+      "hard_successes": 240,
+      "hard_total": 250,
+      "hard_sr": 0.96,
+      "overall_successes": 481,
+      "overall_total": 500,
+      "overall_sr": 0.962,
+      "hard_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b2_lora_forward_s42_hard_5x50.json",
+      "full_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b2_lora_forward_s42_full_10x50.json",
+      "checkpoint_sha256": "2d85c5002621fffd596852b02a5bc53334e1cab7bc57a0b4e5f4dbf596c7303b"
+    },
+    "B3_forward_inverse": {
+      "hard_successes": 239,
+      "hard_total": 250,
+      "hard_sr": 0.956,
+      "overall_successes": 483,
+      "overall_total": 500,
+      "overall_sr": 0.966,
+      "hard_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b3_lora_forward_inverse_s42_hard_5x50.json",
+      "full_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b3_lora_forward_inverse_s42_full_10x50.json",
+      "checkpoint_sha256": "63d2758175b072151b0be06b2379af608ed4fa31d9a1b2b804d8123fe7d10268"
+    },
+    "B4_naive_fic": {
+      "hard_successes": 240,
+      "hard_total": 250,
+      "hard_sr": 0.96,
+      "overall_successes": 486,
+      "overall_total": 500,
+      "overall_sr": 0.972,
+      "hard_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b4_lora_fic_s42_hard_5x50.json",
+      "full_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b4_lora_fic_s42_full_10x50.json",
+      "checkpoint_sha256": "eeeec134a6f95215669bc0f280782cd8b2145189f7d5bf07a7291a9918e35bcf"
+    },
+    "B5_aligned_fic": {
+      "hard_successes": 242,
+      "hard_total": 250,
+      "hard_sr": 0.968,
+      "overall_successes": 489,
+      "overall_total": 500,
+      "overall_sr": 0.978,
+      "hard_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b5_aligned_fic_s42_hard_5x50.json",
+      "full_path": "/DATA/disk0/jianhua/experiments/iclr_2027/iclr_b5_aligned_fic_s42_full_10x50.json",
+      "checkpoint_sha256": "9ce02270651e0c38f4235e19c36fb2417373dc449cd64fd9313afad6e542289b"
+    }
+  },
+  "b6_physics_eligible": false,
+  "next_stage": "stop_physics_and_prepare_diagnostic_fallback",
+  "invalid_legacy_results": {
+    "keys": [
+      "floor_a0",
+      "primary_a05_gate",
+      "tuned_a01_gate"
+    ],
+    "reason": "custom rollout was not protocol-aligned; excluded from main paper table"
+  }
+}

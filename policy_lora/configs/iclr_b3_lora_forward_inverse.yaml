@@ -1,0 +1,56 @@
+project_name: world2wam_lora_fic_hard
+fastwam_root: /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM
+libero_root: /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/code/LIBERO_fresh
+fastwam_task_config: libero_uncond_2cam224_1e-4
+experiment_role: iclr_b3_lora_forward_inverse
+official_fastwam_checkpoint: /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt
+backbone_mode: lora
+use_future_latent_distill: true
+policy_action_only_loss: true
+train_future_head: true
+use_gt_action_for_future_head: true
+use_target_future_for_inverse_head: true
+enable_inverse: true
+enable_cycle: false
+lambda_action: 1.0
+lambda_fwd: 0.1
+lambda_inv: 0.05
+lambda_cycle: 0.0
+world_loss_scale: 1.0
+world_gradient_mode: naive
+gradient_log_every: 100
+future_loss_warmup_steps: 500
+future_horizon: 1
+future_latent_dim: 48
+hidden_dim: 1024
+action_dim: 7
+inverse_hidden_size: 1024
+lora_rank: 8
+lora_alpha: 16
+lora_target_modules: [q, k, v, o]
+hard_sample_fraction: 0.5
+hard_task_keywords:
+  - "next to the ramekin"
+  - "on the cookie box"
+  - "top drawer of the wooden cabinet"
+  - "on the ramekin"
+  - "on the stove"
+  - "next to the plate"
+batch_size: 2
+num_epochs: 2
+lr: 1.0e-4
+backbone_lr: 5.0e-5
+seed: 42
+num_workers: 2
+device: cuda
+lerobot_dataset_dirs:
+  - /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM/data/libero_mujoco3.3.2/libero_spatial_no_noops_lerobot
+cache_dir: /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/minimal_world2wam/data/future_latents
+output_dir: /DATA/disk0/jianhua/experiments/iclr_2027/iclr_b3_lora_forward_inverse
+dataset_stats_path: /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+mixed_precision: bf16
+log_every: 20
+save_every: 500
+keep_last_checkpoints: 3
+max_train_steps: 6000
+precompute_max_samples: 12000

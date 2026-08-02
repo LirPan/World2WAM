@@ -2,6 +2,11 @@
 
 **Learn the world with physics, generate actions with diffusion.**
 
+> **Branch guide for advisors:** see [`VERSIONS.md`](VERSIONS.md).  
+> - [`version-c`](https://github.com/LirPan/World2WAM/tree/version-c) — physics-gated residual  
+> - [`latest`](https://github.com/LirPan/World2WAM/tree/latest) — ICLR ActionDiT-LoRA pilot (this branch when on `latest`)  
+> - Results: [`docs/ICLR_PILOT_RESULTS.md`](docs/ICLR_PILOT_RESULTS.md)
+
 Version A architecture: decouple world understanding from action generation on frozen FastWAM pooled latents.
 
 ## Architecture
@@ -72,6 +77,20 @@ Same world losses as Version A (Forward / Inverse / Cycle / Physics), but Flow t
 ```bash
 bash scripts/run_version_c_pipeline.sh all
 ```
+
+## Latest (ICLR): ActionDiT-LoRA + world regularizers
+
+Primary **control** path for beating FastWAM’s ~96.2% LIBERO-Spatial floor: PEFT LoRA on ActionDiT, optional Forward/Inverse/Cycle regularizers, official `eval_libero_single` protocol.
+
+| Item | Path |
+|------|------|
+| Package | [`policy_lora/`](policy_lora/) |
+| Pilot results | [docs/ICLR_PILOT_RESULTS.md](docs/ICLR_PILOT_RESULTS.md) |
+| Train action-LoRA | `bash scripts/train_policy_lora_action.sh` |
+| Train LoRA+FIC | `bash scripts/train_policy_lora_fic.sh` |
+| Export merged ckpt | `bash scripts/export_lora_fic_official.sh` |
+
+Best pilot numbers (seed 42): **B5 overall 97.8% (489/500)**; **B1 hard 97.6% (244/250)**. Floor: 96.2% / hard 234/250.
 
 ## Background jobs (GPU poll)
 
