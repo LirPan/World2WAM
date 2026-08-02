@@ -59,6 +59,20 @@ Full FastWAM MoT + physics routing on action tokens. Code under [`version_b/`](v
 
 See [version_b/README.md](version_b/README.md).
 
+## Version C (Physics-Gated Residual)
+
+Same world losses as Version A (Forward / Inverse / Cycle / Physics), but Flow targets \(\delta=a_{\text{GT}}-a_{\text{FW}}\) and LIBERO uses \(a=a_{\text{FW}}+\alpha\cdot\hat\delta\).
+
+| Item | Path |
+|------|------|
+| Config | `configs/world2wam_physics_residual_flow_dit_vc.yaml` |
+| Pipeline | `scripts/run_version_c_pipeline.sh` |
+| Docs | [docs/version_c_residual.md](docs/version_c_residual.md) |
+
+```bash
+bash scripts/run_version_c_pipeline.sh all
+```
+
 ## Background jobs (GPU poll)
 
 ```bash

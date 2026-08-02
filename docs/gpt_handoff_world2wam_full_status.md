@@ -1,6 +1,6 @@
 # World2WAM 项目完整进度报告（GPT Handoff）
 
-> 生成时间：2026-07-08  
+> 生成时间：2026-07-08（**Sim 0% 诊断更新：2026-07-14**）  
 > 工作区：`/DATA/disk0/jianhua`  
 > 主代码目录：`Physics-Aligned World2WAM/`（软链接 `minimal_world2wam` → 同目录）  
 > Import 名：`minimal_world2wam`  
@@ -15,9 +15,11 @@ World2WAM 在 LIBERO spatial 上基于 **冻结 FastWAM 的 48-d pooled VAE late
 
 1. **idea2 全链路**（300k cache → Stage1 heads → Stage2 MLP adapter + offline eval）
 2. **Action Adapter 三代**：`mlp`（已训）→ `light_dit`（代码集成）→ `flow_dit`（Flow Matching，代码+单测完成）
-3. **idea3 Physics v1**：8-phase 伪标签 + confidence、Router train/infer 双模式、`physics_code` 注入 heads/adapters、CPU smoke 通过
+3. **idea3 Physics v1**：8-phase 伪标签 + confidence、Router train/infer 双模式、`physics_code` 注入 heads/adapters
+4. **Version A 正式训**：816k cache → Physics FlowDiT 20k steps → `experiments/world2wam_physics_flow_dit_main/physics_world2wam_final.pt`
+5. **Sim 0% 根因已定位（2026-07-14）**：onestep 完全替换 FastWAM 导致 0%；**residual blend** `(1-α)a_fw+α a_adapter` 在 1×10 上可达 100%（α=0.1）
 
-**未完成**：FlowDiT / LightDiT / Physics v1 的 GPU 正式训练、paper 级 LIBERO sim eval、Physics 标签质量（cache 缺 task text → uncertain 偏高）。
+**论文主对比应改为 residual（非 onestep）**。全量 10×50 residual 确认评测在跑（`cache/bg_jobs/phase_e_confirm.log`）。
 
 **硬约束**：不改 FastWAM 源码；训练只读 cache；不做 token-level ProPhy REB。
 
@@ -314,11 +316,45 @@ $PY "Physics-Aligned World2WAM/tools/inspect_physics_labels.py" \
 
 ### GPU 空闲后（优先）
 
-1. Stage2 FlowDiT 正式训（warm-start Stage1）
-2. Physics v1 + FlowDiT / MLP 正式训
-3. Offline MSE 对比：MLP vs Flow vs Physics
-4. Sim eval：baseline → residual_flow_dit → residual_physics_*
-5. 接入 raw task text 改善 phase 伪标签
+1. ~~Stage2 FlowDiT / Physics 正式训~~ ✅（816k，20k steps）
+2. 等 Phase E：`ours_residual_physics_flow_dit` / `ours_residual_flow_dit` α=0.1 的 **10×50** 出数
+3. 接入 raw task text 改善 phase 伪标签；可选：把 adapter 改造成真正 residual（预测 `a_gt-a_fw`）再训
+4. Onestep 仅作 ablation（已知上限接近 0%）
+
+---
+
+## 11.5 Sim 0% 分层诊断结论（2026-07-14）
+
+### 现象
+
+| 模式 | 成功率 |
+|------|--------|
+| Official baseline subprocess | 96.8%（10×50）/ 90%（1×10） |
+| `ours_dit`（FastWAM 走我们的 sim loop） | **90%**（1×10）→ 自定义 loop/postprocess **正常** |
+| `ours_onestep_flow_dit` / `_physics_` | **0%**（10×50 与 1×10） |
+| residual blend α=0（=纯 FastWAM） | 70%（1×10） |
+| residual blend α=0.1 | **100%**（1×10） |
+
+Cache 侧模型健康：Phase A `mse_physics≈0.056`（normalized），物理空间 MSE≈0.025；ckpt/`state_dim=8` 加载 OK。
+
+### 根因（L5）
+
+**Onestep 用 Adapter 完全替换 FastWAM 动作专家**；Adapter 在 cache 上 MSE 尚可，但不足以单独作为 LIBERO policy。  
+非 Physics 也为 0% → **不是 Router/伪标签单独导致**。
+
+### 已修 bug（L7 / residual 接口）
+
+1. `wrappers/fastwam_encoder.py`：`batch.get("proprio") or ...` 对 Tensor 非法 → 改为 `is None` 判断（曾阻断 `ours_dit` / residual）
+2. Residual eval：Adapter 训的是**绝对动作**，改为 `a=(1-α)a_fw + α a_adapter`（旧实现 `a_fw + α·a_adapter` 尺度错误）
+3. `load_checkpoint` 打印 missing/unexpected keys；physics `pred_phase` 在 rollout 后写入
+4. Offline：`phase_logits or physics_logits` 已改为 None 判断
+
+### 诊断产物
+
+- `tools/diagnose_sim_zero.py` → `experiments/diagnose_sim_zero_report.json`
+- `experiments/diagnose_sim_matrix/C*.json`
+- `experiments/eval_offline_physics_flow_dit_main.json`
+- 确认评测日志：`cache/bg_jobs/phase_e_confirm.log`
 
 ---
 

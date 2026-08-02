@@ -233,6 +233,7 @@ def latent_verification(cfg: dict, cache_dir: Path, heads_ckpt: Path | None, dev
 
 
 def _load_libero_eval_deps(cfg: dict):
+    _ensure_libero_importable(cfg)
     fastwam_root = Path(cfg["fastwam_root"]).resolve()
     for p in (fastwam_root, fastwam_root / "src"):
         s = str(p)
@@ -290,6 +291,33 @@ def _extract_sim_state(obs: dict, quat2axisangle) -> np.ndarray:
     ).astype(np.float32)
 
 
+# Match FastWAM official LIBERO eval prompt template.
+_DEFAULT_PROMPT = (
+    "A video recorded from a robot's point of view executing the following instruction: {task}"
+)
+
+
+def _format_official_prompt(task_desc: str) -> str:
+    return _DEFAULT_PROMPT.format(task=task_desc)
+
+
+def _normalize_proprio(proprio: np.ndarray, processor) -> np.ndarray:
+    """Match FastWAM eval_libero_single._normalize_proprio (returns float32 [D])."""
+    state_meta = processor.shape_meta["state"]
+    if len(state_meta) != 1:
+        raise ValueError(
+            "LIBERO eval currently expects a single merged state key in shape_meta['state']."
+        )
+    state_key = state_meta[0]["key"]
+    state_batch = {"state": {state_key: torch.as_tensor(proprio, dtype=torch.float32).unsqueeze(0)}}
+    state_batch = processor.action_state_transform(state_batch)
+    state_batch = processor.normalizer.forward(state_batch)
+    out = state_batch["state"][state_key]
+    if torch.is_tensor(out):
+        out = out.detach().cpu().numpy()
+    return np.asarray(out, dtype=np.float32).reshape(-1)
+
+
 def _build_fastwam_processor(cfg: dict):
     (
         _benchmark,
@@ -339,13 +367,106 @@ def _apply_fastwam_device(cfg: dict, device: str | None) -> dict:
 def _num_inference_steps(cfg: dict, args) -> int:
     if getattr(args, "num_inference_steps", None) is not None:
         return int(args.num_inference_steps)
-    return int(cfg.get("eval", {}).get("num_inference_steps", 20))
+    # Official FastWAM train.yaml: eval_num_inference_steps=10
+    return int(cfg.get("eval", {}).get("num_inference_steps", 10))
 
 
-def _postprocess_sim_action(action: torch.Tensor, processor, invert_gripper_action) -> np.ndarray:
+def _postprocess_sim_action(
+    action: torch.Tensor,
+    processor,
+    invert_gripper_action,
+    *,
+    binarize_gripper: bool = True,
+) -> np.ndarray:
+    """Match FastWAM official sim postprocess (denorm → *2-1 → invert → optional binarize)."""
     action = _denormalize_action(action, processor)[0]
     action[..., -1] = action[..., -1] * 2 - 1
-    return invert_gripper_action(action)
+    action = invert_gripper_action(action)
+    if binarize_gripper:
+        action[..., -1] = np.sign(action[..., -1])
+    return action
+
+
+def _parse_task_ids(args, n_tasks: int) -> list[int]:
+    """Resolve task ids: --task_ids wins over 0..max_tasks-1."""
+    raw = getattr(args, "task_ids", None)
+    if raw:
+        ids = [int(x.strip()) for x in str(raw).split(",") if x.strip() != ""]
+        bad = [i for i in ids if i < 0 or i >= n_tasks]
+        if bad:
+            raise ValueError(f"--task_ids out of range for suite ({n_tasks} tasks): {bad}")
+        return ids
+    max_tasks = min(int(args.max_tasks), n_tasks)
+    return list(range(max_tasks))
+
+
+def _parse_adapter_phases(args) -> set[str] | None:
+    raw = getattr(args, "adapter_phases", None)
+    if not raw:
+        return None
+    phases = {p.strip() for p in str(raw).split(",") if p.strip()}
+    unknown = phases - set(PHYSICS_PHASES)
+    if unknown:
+        raise ValueError(f"--adapter_phases unknown: {sorted(unknown)}; valid={PHYSICS_PHASES}")
+    return phases
+
+
+def _effective_residual_alpha(
+    base_alpha: float,
+    *,
+    residual_gate: str = "none",
+    confidence: torch.Tensor | float | None = None,
+    a_fw: torch.Tensor | None = None,
+    a_adapter: torch.Tensor | None = None,
+    gate_confidence_thr: float = 0.4,
+    gate_disagree_thr: float = 0.5,
+    adapter_phases: set[str] | None = None,
+    phase_name: str | None = None,
+    zero_alpha_on_uncertain: bool = False,
+) -> float:
+    """Lean FastWAM when unsure / disagreeing / wrong phase.
+
+    Blend convention (absolute-action adapter):
+      a = (1 - α_eff) * a_fw + α_eff * a_adapter
+    """
+    alpha = float(base_alpha)
+    if alpha <= 0.0:
+        return 0.0
+
+    if zero_alpha_on_uncertain and phase_name == "uncertain":
+        return 0.0
+    if adapter_phases is not None and (phase_name is None or phase_name not in adapter_phases):
+        return 0.0
+
+    gate = (residual_gate or "none").lower()
+    if gate in ("none", "off", ""):
+        return alpha
+
+    if gate in ("confidence_soft", "conf_soft"):
+        if confidence is None:
+            return alpha
+        conf = float(confidence.detach().mean().item()) if torch.is_tensor(confidence) else float(confidence)
+        return max(0.0, min(alpha, alpha * conf))
+
+    if gate in ("confidence_hard", "conf_hard"):
+        if confidence is None:
+            return alpha
+        conf = float(confidence.detach().mean().item()) if torch.is_tensor(confidence) else float(confidence)
+        return alpha if conf >= float(gate_confidence_thr) else 0.0
+
+    if gate in ("disagreement", "disagree"):
+        if a_fw is None or a_adapter is None:
+            return alpha
+        # Mean abs action disagreement; shrink alpha when adapter drifts from FastWAM.
+        disagree = (a_adapter.to(a_fw.device) - a_fw).abs().mean().item()
+        thr = max(float(gate_disagree_thr), 1e-6)
+        scale = max(0.0, 1.0 - float(disagree) / thr)
+        return alpha * scale
+
+    raise ValueError(
+        f"Unknown --residual_gate={residual_gate!r}; "
+        "use none|confidence_soft|confidence_hard|disagreement"
+    )
 
 
 def _run_libero_rollout(
@@ -379,11 +500,15 @@ def _run_libero_rollout(
     if suite_name not in benchmark_dict:
         raise ValueError(f"Unknown LIBERO suite {suite_name}")
     suite = benchmark_dict[suite_name]()
-    max_tasks = min(int(args.max_tasks), suite.n_tasks)
+    task_ids = _parse_task_ids(args, suite.n_tasks)
+    max_tasks = len(task_ids)
     num_trials = int(args.num_trials)
     max_steps = int(args.max_steps)
     warmup_steps = int(args.warmup_steps)
     horizon = int(cfg.get("horizon", 10))
+    # Official FastWAM sim_libero.yaml: replan_steps=10 (execute first K of chunk, then replan).
+    replan_steps = int(getattr(args, "replan_steps", None) or (cfg.get("eval") or {}).get("replan_steps", 10))
+    replan_steps = max(1, min(replan_steps, horizon))
 
     video_size = hydra_cfg.data.train.get("video_size", [224, 448])
     input_h, input_w = int(video_size[0]), int(video_size[1])
@@ -395,7 +520,7 @@ def _run_libero_rollout(
     infer_times_ms: list[float] = []
     per_task: list[dict] = []
 
-    for task_id in range(max_tasks):
+    for task_id in task_ids:
         task = suite.get_task(task_id)
         init_states = list(suite.get_task_init_states(task_id))
         while len(init_states) < num_trials:
@@ -420,16 +545,19 @@ def _run_libero_rollout(
 
                 if len(pending_actions) == 0:
                     rgb = _prepare_obs_frame(obs, get_libero_image, input_w, input_h, concat_mode)
-                    proprio = _extract_sim_state(obs, quat2axisangle)
+                    # Official FastWAM: DEFAULT_PROMPT + normalized proprio (critical for ~96% SR).
+                    proprio_raw = _extract_sim_state(obs, quat2axisangle)
+                    proprio = _normalize_proprio(proprio_raw, processor)
+                    prompt = _format_official_prompt(task_desc)
                     action, latency_ms = predict_action_chunk(
                         rgb=rgb,
                         obs=obs,
-                        task_desc=task_desc,
+                        task_desc=prompt,
                         proprio=proprio,
                         horizon=horizon,
                     )
                     infer_times_ms.append(latency_ms)
-                    pending_actions = action[:horizon].tolist()
+                    pending_actions = action[:replan_steps].tolist()
 
                 obs, _, done, _ = env.step(pending_actions.pop(0))
                 step_count += 1
@@ -449,7 +577,10 @@ def _run_libero_rollout(
         "mode": mode,
         "suite": suite_name,
         "max_tasks": max_tasks,
+        "task_ids": task_ids,
         "num_trials": num_trials,
+        "warmup_steps": warmup_steps,
+        "replan_steps": replan_steps,
         "success_rate": float(total_success) / max(total_episodes, 1),
         "successes": total_success,
         "total_episodes": total_episodes,
@@ -497,7 +628,7 @@ def run_ours_onestep_sim(cfg: dict, args, *, adapter_type: str, mode: str) -> di
     """One-step policy: a = Adapter(z_t, text) with MLP, LightActionDiT, or FlowActionDiT."""
     cfg = _apply_fastwam_device(cfg, args.device)
     deps = _load_libero_eval_deps(cfg)
-    invert_gripper_action = deps[5]
+    invert_gripper_action = deps[4]  # deps: ..., image, invert_gripper, quat2axisangle, ...
     processor, _hydra_cfg = _build_fastwam_processor(cfg)
 
     cfg = dict(cfg)
@@ -541,7 +672,12 @@ def run_ours_onestep_sim(cfg: dict, args, *, adapter_type: str, mode: str) -> di
             else:
                 pred_action = call_action_adapter(adapter, z_t.to(device), text_embed)
         latency_ms = (time.perf_counter() - t0) * 1000.0
-        action = _postprocess_sim_action(pred_action, processor, invert_gripper_action)
+        action = _postprocess_sim_action(
+            pred_action,
+            processor,
+            invert_gripper_action,
+            binarize_gripper=bool(getattr(args, "binarize_gripper", True)),
+        )
         return action, latency_ms
 
     result_extra = {
@@ -562,10 +698,14 @@ def run_ours_onestep_sim(cfg: dict, args, *, adapter_type: str, mode: str) -> di
 
 
 def run_ours_residual_variant_sim(cfg: dict, args, *, adapter_type: str, mode: str) -> dict:
-    """Residual: a_final = a_fastwam + alpha * Adapter(z_t, text)."""
+    """Residual over FastWAM.
+
+    blend (Version A): a = (1-α)*a_FW + α*a_adapter   (adapter predicts absolute actions)
+    additive (Version C): a = a_FW + α*δ               (adapter predicts δ = a* - a_FW)
+    """
     cfg = _apply_fastwam_device(cfg, args.device)
     deps = _load_libero_eval_deps(cfg)
-    invert_gripper_action = deps[5]
+    invert_gripper_action = deps[4]  # deps: ..., image, invert_gripper, quat2axisangle, ...
     processor, _hydra_cfg = _build_fastwam_processor(cfg)
 
     cfg = dict(cfg)
@@ -579,6 +719,15 @@ def run_ours_residual_variant_sim(cfg: dict, args, *, adapter_type: str, mode: s
 
     num_steps = _num_inference_steps(cfg, args)
     residual_alpha = float(getattr(args, "residual_alpha", 0.1))
+    residual_gate = str(getattr(args, "residual_gate", "none") or "none")
+    gate_disagree_thr = float(getattr(args, "gate_disagree_thr", 0.5))
+    residual_mode = str(
+        getattr(args, "residual_mode", None)
+        or (cfg.get("eval") or {}).get("residual_mode")
+        or "blend"
+    ).lower()
+    if residual_mode not in ("blend", "additive"):
+        raise ValueError(f"--residual_mode must be blend|additive, got {residual_mode!r}")
 
     if not args.adapter_ckpt:
         raise ValueError(f"--adapter_ckpt is required for --mode {mode}")
@@ -591,6 +740,7 @@ def run_ours_residual_variant_sim(cfg: dict, args, *, adapter_type: str, mode: s
     adapter = adapter.to(device).eval()
     flow_sample_steps = int(getattr(args, "flow_sample_steps", 10) or 10)
     use_flow = is_flow_adapter(adapter)
+    alpha_eff_hist: list[float] = []
 
     def predict_action_chunk(*, rgb, obs, task_desc, proprio, horizon):
         del obs
@@ -613,36 +763,61 @@ def run_ours_residual_variant_sim(cfg: dict, args, *, adapter_type: str, mode: s
             text_embed, _text_mask = encoder.encode_text_from_prompt(task_desc)
             text_embed = text_embed.to(device=device)
             if use_flow:
-                delta = sample_action_adapter(
+                adapter_out = sample_action_adapter(
                     adapter,
                     z_t.to(device),
                     text_embed,
                     num_steps=flow_sample_steps,
                 )
             else:
-                delta = call_action_adapter(adapter, z_t.to(device), text_embed)
-            pred_action = a_fastwam.to(device) + residual_alpha * delta
+                adapter_out = call_action_adapter(adapter, z_t.to(device), text_embed)
+            a_fw = a_fastwam.to(device)
+            a_ad = adapter_out.to(device)
+            alpha_eff = _effective_residual_alpha(
+                residual_alpha,
+                residual_gate=residual_gate,
+                a_fw=a_fw,
+                a_adapter=a_ad if residual_mode == "blend" else (a_fw + a_ad),
+                gate_disagree_thr=gate_disagree_thr,
+            )
+            alpha_eff_hist.append(float(alpha_eff))
+            if residual_mode == "additive":
+                pred_action = a_fw + alpha_eff * a_ad
+            else:
+                pred_action = (1.0 - alpha_eff) * a_fw + alpha_eff * a_ad
         latency_ms = (time.perf_counter() - t0) * 1000.0
-        action = _postprocess_sim_action(pred_action, processor, invert_gripper_action)
+        action = _postprocess_sim_action(
+            pred_action,
+            processor,
+            invert_gripper_action,
+            binarize_gripper=bool(getattr(args, "binarize_gripper", True)),
+        )
         return action, latency_ms
 
     result_extra = {
         "strategy": "residual_adapter",
+        "residual_mode": residual_mode,
         "adapter_type": resolved_type,
         "residual_alpha": residual_alpha,
+        "residual_gate": residual_gate,
+        "gate_disagree_thr": gate_disagree_thr,
         "adapter_ckpt": str(ckpt_path),
         "num_inference_steps": num_steps,
     }
     if use_flow:
         result_extra["flow_sample_steps"] = flow_sample_steps
 
-    return _run_libero_rollout(
+    results = _run_libero_rollout(
         cfg,
         args,
         mode=mode,
         predict_action_chunk=predict_action_chunk,
         result_extra=result_extra,
     )
+    if alpha_eff_hist:
+        results["mean_alpha_eff"] = float(np.mean(alpha_eff_hist))
+        results["alpha_eff_n"] = len(alpha_eff_hist)
+    return results
 
 
 def _load_physics_model_for_eval(cfg: dict, ckpt_path: Path, adapter_type_override: str | None = None):
@@ -652,7 +827,16 @@ def _load_physics_model_for_eval(cfg: dict, ckpt_path: Path, adapter_type_overri
     device = cfg.get("fastwam", {}).get("device", "cuda")
     if device == "cuda" and not torch.cuda.is_available():
         device = "cpu"
-    model, adapter_type = build_physics_model(cfg, None, device)
+    # Must match training: StudentPhysicsRouter in_dim = latent + text_dim + state_dim.
+    # Without cache_dir, state_dim defaults to 0 (560) but ckpt was trained with state_dim=8 (568).
+    cache_dir = _resolve_path((cfg.get("cache") or {}).get("output_dir"))
+    meta = None
+    if cache_dir is not None and cache_dir.is_dir():
+        try:
+            meta = load_meta(cache_dir)
+        except FileNotFoundError:
+            meta = None
+    model, adapter_type = build_physics_model(cfg, meta, device, cache_dir=cache_dir)
     load_physics_checkpoint(model, ckpt_path, expected_adapter_type=adapter_type_override or adapter_type)
     return model, adapter_type
 
@@ -661,7 +845,7 @@ def run_ours_physics_onestep_sim(cfg: dict, args, *, adapter_type: str, mode: st
     """Physics-conditioned one-step: router inference + adapter."""
     cfg = _apply_fastwam_device(cfg, args.device)
     deps = _load_libero_eval_deps(cfg)
-    invert_gripper_action = deps[5]
+    invert_gripper_action = deps[4]  # deps: ..., image, invert_gripper, quat2axisangle, ...
     processor, _hydra_cfg = _build_fastwam_processor(cfg)
 
     cfg = dict(cfg)
@@ -709,15 +893,22 @@ def run_ours_physics_onestep_sim(cfg: dict, args, *, adapter_type: str, mode: st
             if pred_action is None:
                 raise RuntimeError("Physics model did not return pred_action")
             nonlocal last_phase_prob, last_pred_phase
-            probs = out.get("phase_prob") or out.get("physics_probs")
+            probs = out.get("phase_prob")
+            if probs is None:
+                probs = out.get("physics_probs")
             if probs is not None:
                 last_phase_prob = probs[0].detach().cpu().tolist()
                 last_pred_phase = PHYSICS_PHASES[int(probs.argmax(dim=-1)[0].item())]
         latency_ms = (time.perf_counter() - t0) * 1000.0
-        action = _postprocess_sim_action(pred_action, processor, invert_gripper_action)
+        action = _postprocess_sim_action(
+            pred_action,
+            processor,
+            invert_gripper_action,
+            binarize_gripper=bool(getattr(args, "binarize_gripper", True)),
+        )
         return action, latency_ms
 
-    return _run_libero_rollout(
+    results = _run_libero_rollout(
         cfg,
         args,
         mode=mode,
@@ -729,17 +920,54 @@ def run_ours_physics_onestep_sim(cfg: dict, args, *, adapter_type: str, mode: st
             "phase_label_version": phase_label_version,
             "flow_sample_steps": flow_sample_steps,
             "adapter_ckpt": str(ckpt_path),
-            "pred_phase": last_pred_phase,
-            "phase_prob": last_phase_prob,
         },
     )
+    # Record phase after rollouts (result_extra is snapshotted at call time).
+    results["pred_phase"] = last_pred_phase
+    results["phase_prob"] = last_phase_prob
+    return results
 
 
 def run_ours_physics_residual_sim(cfg: dict, args, *, adapter_type: str, mode: str) -> dict:
-    """Physics residual: a_final = a_fastwam + alpha * physics_adapter(z_t, text)."""
+    """Physics residual over FastWAM.
+
+    blend: a = (1-α)*a_FW + α*a_abs
+    additive (Version C): a = a_FW + α*δ
+    """
+    residual_alpha = float(
+        getattr(args, "residual_alpha", None)
+        if getattr(args, "residual_alpha", None) is not None
+        else (cfg.get("eval") or {}).get("residual_alpha", 0.1)
+    )
+    # α<=0 or tiny floor eps => pure FastWAM floor via official baseline (~96%).
+    alpha_eff_floor_eps = float(
+        getattr(args, "alpha_eff_floor_eps", None)
+        if getattr(args, "alpha_eff_floor_eps", None) is not None
+        else (cfg.get("eval") or {}).get("alpha_eff_floor_eps", 1e-4)
+    )
+    if residual_alpha <= max(0.0, alpha_eff_floor_eps):
+        base = run_baseline_sim(
+            cfg,
+            max_tasks=int(args.max_tasks),
+            num_trials=int(args.num_trials),
+            device_override=args.device,
+        )
+        base["mode"] = mode
+        base["strategy"] = "physics_residual_shortcircuit_baseline"
+        base["residual_alpha"] = float(residual_alpha)
+        base["residual_gate"] = "none"
+        base["residual_mode"] = str(
+            getattr(args, "residual_mode", None)
+            or (cfg.get("eval") or {}).get("residual_mode")
+            or "additive"
+        )
+        base["mean_alpha_eff"] = 0.0
+        base["alpha_eff_floor_eps"] = alpha_eff_floor_eps
+        return base
+
     cfg = _apply_fastwam_device(cfg, args.device)
     deps = _load_libero_eval_deps(cfg)
-    invert_gripper_action = deps[5]
+    invert_gripper_action = deps[4]  # deps: ..., image, invert_gripper, quat2axisangle, ...
     processor, _hydra_cfg = _build_fastwam_processor(cfg)
 
     cfg = dict(cfg)
@@ -752,7 +980,33 @@ def run_ours_physics_residual_sim(cfg: dict, args, *, adapter_type: str, mode: s
         device = "cpu"
 
     num_steps = _num_inference_steps(cfg, args)
-    residual_alpha = float(getattr(args, "residual_alpha", 0.1))
+    eval_cfg = cfg.get("eval") or {}
+    residual_gate = str(
+        getattr(args, "residual_gate", None)
+        or eval_cfg.get("residual_gate")
+        or "none"
+    )
+    residual_mode = str(
+        getattr(args, "residual_mode", None)
+        or eval_cfg.get("residual_mode")
+        or "blend"
+    ).lower()
+    if residual_mode not in ("blend", "additive"):
+        raise ValueError(f"--residual_mode must be blend|additive, got {residual_mode!r}")
+    gate_confidence_thr = float(getattr(args, "gate_confidence_thr", 0.4))
+    gate_disagree_thr = float(getattr(args, "gate_disagree_thr", 0.5))
+    zero_alpha_on_uncertain = bool(
+        getattr(args, "zero_alpha_on_uncertain", False)
+        or eval_cfg.get("zero_alpha_on_uncertain", False)
+    )
+    if getattr(args, "adapter_phases", None):
+        adapter_phases = _parse_adapter_phases(args)
+    elif eval_cfg.get("adapter_phases"):
+        class _Tmp:
+            adapter_phases = eval_cfg.get("adapter_phases")
+        adapter_phases = _parse_adapter_phases(_Tmp())
+    else:
+        adapter_phases = None
     flow_sample_steps = int(getattr(args, "flow_sample_steps", 10) or 10)
 
     if not args.adapter_ckpt:
@@ -766,6 +1020,7 @@ def run_ours_physics_residual_sim(cfg: dict, args, *, adapter_type: str, mode: s
     phase_label_version = getattr(args, "phase_label_version", None) or cfg.get("physics", {}).get(
         "phase_label_version", "v1"
     )
+    alpha_eff_hist: list[float] = []
 
     def predict_action_chunk(*, rgb, obs, task_desc, proprio, horizon):
         del obs
@@ -784,6 +1039,7 @@ def run_ours_physics_residual_sim(cfg: dict, args, *, adapter_type: str, mode: s
         t0 = time.perf_counter()
         with inference_guard(), torch.no_grad():
             a_fastwam = encoder.infer_action_only(batch_dit)
+            a_fw = a_fastwam.to(device)
             z_t = encoder.encode_obs_latent(obs_tensor)
             text_embed, _text_mask = encoder.encode_text_from_prompt(task_desc)
             text_embed = text_embed.to(device=device)
@@ -796,27 +1052,71 @@ def run_ours_physics_residual_sim(cfg: dict, args, *, adapter_type: str, mode: s
             delta = out.get("pred_action")
             if delta is None:
                 raise RuntimeError("Physics model did not return pred_action")
-            pred_action = a_fastwam.to(device) + residual_alpha * delta
+            a_ad = delta.to(device)
+            probs = out.get("phase_prob")
+            if probs is None:
+                probs = out.get("physics_probs")
+            phase_name = None
+            if probs is not None:
+                phase_name = PHYSICS_PHASES[int(probs.argmax(dim=-1)[0].item())]
+            # For disagreement gate in additive mode, compare reconstructed absolute.
+            a_abs_for_gate = a_fw + a_ad if residual_mode == "additive" else a_ad
+            alpha_eff = _effective_residual_alpha(
+                residual_alpha,
+                residual_gate=residual_gate,
+                confidence=out.get("confidence"),
+                a_fw=a_fw,
+                a_adapter=a_abs_for_gate,
+                gate_confidence_thr=gate_confidence_thr,
+                gate_disagree_thr=gate_disagree_thr,
+                adapter_phases=adapter_phases,
+                phase_name=phase_name,
+                zero_alpha_on_uncertain=zero_alpha_on_uncertain,
+            )
+            alpha_eff_hist.append(float(alpha_eff))
+            if alpha_eff <= 0.0:
+                pred_action = a_fw
+            elif residual_mode == "additive":
+                pred_action = a_fw + alpha_eff * a_ad
+            else:
+                pred_action = (1.0 - alpha_eff) * a_fw + alpha_eff * a_ad
         latency_ms = (time.perf_counter() - t0) * 1000.0
-        action = _postprocess_sim_action(pred_action, processor, invert_gripper_action)
+        action = _postprocess_sim_action(
+            pred_action,
+            processor,
+            invert_gripper_action,
+            binarize_gripper=bool(getattr(args, "binarize_gripper", True)),
+        )
         return action, latency_ms
 
-    return _run_libero_rollout(
+    results = _run_libero_rollout(
         cfg,
         args,
         mode=mode,
         predict_action_chunk=predict_action_chunk,
         result_extra={
             "strategy": "physics_residual",
+            "residual_mode": residual_mode,
             "adapter_type": resolved_type,
             "use_physics": True,
             "phase_label_version": phase_label_version,
             "residual_alpha": residual_alpha,
+            "residual_gate": residual_gate,
+            "gate_confidence_thr": gate_confidence_thr,
+            "gate_disagree_thr": gate_disagree_thr,
+            "zero_alpha_on_uncertain": zero_alpha_on_uncertain,
+            "adapter_phases": sorted(adapter_phases) if adapter_phases else None,
+            "mean_alpha_eff": float(np.mean(alpha_eff_hist)) if alpha_eff_hist else None,
             "flow_sample_steps": flow_sample_steps,
             "adapter_ckpt": str(ckpt_path),
             "num_inference_steps": num_steps,
         },
     )
+    # Rollout finishes after hist is filled; refresh mean for JSON.
+    if alpha_eff_hist:
+        results["mean_alpha_eff"] = float(np.mean(alpha_eff_hist))
+        results["alpha_eff_n"] = len(alpha_eff_hist)
+    return results
 
 
 def run_ours_adapter_sim(cfg: dict, args) -> dict:
@@ -828,7 +1128,7 @@ def run_ours_dit_sim(cfg: dict, args) -> dict:
     """FastWAM Action DiT: frozen infer_action() diffusion (matches idea2 design inference path)."""
     cfg = _apply_fastwam_device(cfg, args.device)
     deps = _load_libero_eval_deps(cfg)
-    invert_gripper_action = deps[5]
+    invert_gripper_action = deps[4]  # deps: ..., image, invert_gripper, quat2axisangle, ...
     processor, _hydra_cfg = _build_fastwam_processor(cfg)
 
     cfg = dict(cfg)
@@ -860,7 +1160,12 @@ def run_ours_dit_sim(cfg: dict, args) -> dict:
         with inference_guard(), torch.no_grad():
             pred_action = encoder.infer_action_only(batch)
         latency_ms = (time.perf_counter() - t0) * 1000.0
-        action = _postprocess_sim_action(pred_action, processor, invert_gripper_action)
+        action = _postprocess_sim_action(
+            pred_action,
+            processor,
+            invert_gripper_action,
+            binarize_gripper=bool(getattr(args, "binarize_gripper", True)),
+        )
         return action, latency_ms
 
     return _run_libero_rollout(
@@ -923,6 +1228,7 @@ def main() -> None:
             "ours_residual_physics_mlp",
             "ours_residual_physics_light_dit",
             "ours_residual_physics_flow_dit",
+            "ours_residual_physics_flow_dit_vc",
             "offline",
         ],
         default="baseline",
@@ -934,14 +1240,76 @@ def main() -> None:
     parser.add_argument("--max_tasks", type=int, default=1)
     parser.add_argument("--num_trials", type=int, default=1)
     parser.add_argument("--max_steps", type=int, default=400)
-    parser.add_argument("--warmup_steps", type=int, default=5)
+    parser.add_argument(
+        "--warmup_steps",
+        type=int,
+        default=30,
+        help="Dummy env steps before control (official FastWAM num_steps_wait=30)",
+    )
+    parser.add_argument(
+        "--replan_steps",
+        type=int,
+        default=10,
+        help="Execute first K actions of each chunk then replan (official FastWAM replan_steps=10)",
+    )
     parser.add_argument(
         "--num_inference_steps",
         type=int,
         default=None,
-        help="Diffusion steps for --mode ours_dit / ours_residual (default: config eval.num_inference_steps or 20)",
+        help="Diffusion steps for --mode ours_dit / ours_residual (default: config eval.num_inference_steps or 10)",
     )
-    parser.add_argument("--residual_alpha", type=float, default=0.1)
+    parser.add_argument(
+        "--binarize_gripper",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Match official FastWAM binarize_gripper (default: true)",
+    )
+    parser.add_argument("--residual_alpha", type=float, default=None)
+    parser.add_argument(
+        "--alpha_eff_floor_eps",
+        type=float,
+        default=None,
+        help="If residual_alpha <= eps, shortcircuit to official baseline (default 1e-4).",
+    )
+    parser.add_argument(
+        "--residual_mode",
+        choices=["blend", "additive"],
+        default=None,
+        help="blend: (1-α)a_FW+α a_abs; additive (Version C): a_FW+α·δ",
+    )
+    parser.add_argument(
+        "--residual_gate",
+        choices=["none", "confidence_soft", "confidence_hard", "disagreement"],
+        default=None,
+        help="Lean FastWAM when unsure/disagreeing: shrink effective residual alpha.",
+    )
+    parser.add_argument(
+        "--gate_confidence_thr",
+        type=float,
+        default=0.4,
+        help="For confidence_hard: use adapter only if router confidence >= thr.",
+    )
+    parser.add_argument(
+        "--gate_disagree_thr",
+        type=float,
+        default=0.5,
+        help="For disagreement: α_eff = α * max(0, 1 - mean|a_ad-a_fw|/thr).",
+    )
+    parser.add_argument(
+        "--zero_alpha_on_uncertain",
+        action="store_true",
+        help="Force α_eff=0 when predicted phase is 'uncertain' (physics residual).",
+    )
+    parser.add_argument(
+        "--adapter_phases",
+        default=None,
+        help="Comma-separated phases where adapter is allowed; else α_eff=0. e.g. grasp,place,contact",
+    )
+    parser.add_argument(
+        "--task_ids",
+        default=None,
+        help="Comma-separated task ids to eval (overrides --max_tasks), e.g. 4,7,9",
+    )
     parser.add_argument("--adapter_type", choices=["mlp", "light_dit", "flow_dit"], default=None)
     parser.add_argument("--flow_sample_steps", type=int, default=10)
     parser.add_argument("--phase_label_version", default="v1")
@@ -951,6 +1319,27 @@ def main() -> None:
 
     cfg = load_config(WORKSPACE / args.config)
     set_seed(int(cfg.get("train", {}).get("seed", 42)))
+    eval_cfg = cfg.get("eval") or {}
+    # Fill residual eval defaults from config when CLI omitted.
+    if args.residual_alpha is None:
+        args.residual_alpha = float(eval_cfg.get("residual_alpha", 0.1))
+    if args.residual_mode is None:
+        args.residual_mode = str(eval_cfg.get("residual_mode", "blend"))
+    if args.residual_gate is None:
+        args.residual_gate = str(eval_cfg.get("residual_gate", "none"))
+    if not args.zero_alpha_on_uncertain and eval_cfg.get("zero_alpha_on_uncertain"):
+        args.zero_alpha_on_uncertain = True
+    if args.adapter_phases is None and eval_cfg.get("adapter_phases"):
+        args.adapter_phases = eval_cfg.get("adapter_phases")
+    # Align custom loop knobs with official FastWAM when config provides them.
+    if eval_cfg.get("warmup_steps") is not None and args.warmup_steps == 30:
+        args.warmup_steps = int(eval_cfg["warmup_steps"])
+    if eval_cfg.get("replan_steps") is not None and args.replan_steps == 10:
+        args.replan_steps = int(eval_cfg["replan_steps"])
+    if "binarize_gripper" in eval_cfg and args.binarize_gripper is True:
+        args.binarize_gripper = bool(eval_cfg["binarize_gripper"])
+    if args.num_inference_steps is None and eval_cfg.get("num_inference_steps") is not None:
+        args.num_inference_steps = int(eval_cfg["num_inference_steps"])
 
     if args.mode == "baseline":
         results = run_baseline_sim(
@@ -991,6 +1380,14 @@ def main() -> None:
         results = run_ours_physics_residual_sim(cfg, args, adapter_type="light_dit", mode="ours_residual_physics_light_dit")
     elif args.mode == "ours_residual_physics_flow_dit":
         results = run_ours_physics_residual_sim(cfg, args, adapter_type="flow_dit", mode="ours_residual_physics_flow_dit")
+    elif args.mode == "ours_residual_physics_flow_dit_vc":
+        # Version C primary: additive residual + physics gates from VC config defaults.
+        args.residual_mode = "additive"
+        if args.residual_gate in (None, "none") and eval_cfg.get("residual_gate"):
+            args.residual_gate = str(eval_cfg.get("residual_gate"))
+        results = run_ours_physics_residual_sim(
+            cfg, args, adapter_type="flow_dit", mode="ours_residual_physics_flow_dit_vc"
+        )
     else:
         raise ValueError(args.mode)
 

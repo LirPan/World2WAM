@@ -41,7 +41,7 @@ class FlowActionDiT(nn.Module):
     """
     Flow-matching action DiT: predicts velocity field v_theta(z_t, text, a_tau, tau).
 
-    Main path: condition on (z_t, text, physics_code) only — no future latent.
+    Main path: condition on (z_t, text, physics_code[, proprio]) — no future latent.
     Inverse / cycle: optional future_latent token (z_tH or predicted z_pred_H).
 
     Flow convention (fixed):
@@ -66,12 +66,14 @@ class FlowActionDiT(nn.Module):
         dropout: float = 0.1,
         max_time_embed_period: int = 10000,
         physics_dim: int = 128,
+        proprio_dim: int = 0,
     ):
         super().__init__()
         self.horizon = horizon
         self.action_dim = action_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
+        self.proprio_dim = int(proprio_dim)
 
         self.action_embed = nn.Linear(action_dim, hidden_dim)
         self.z_proj = nn.Linear(latent_dim, hidden_dim)
@@ -79,6 +81,7 @@ class FlowActionDiT(nn.Module):
         self.text_proj = nn.Linear(text_input_dim, hidden_dim)
         self.text_pool_proj = TextProjector(text_input_dim, hidden_dim)
         self.physics_proj = nn.Linear(physics_dim, hidden_dim)
+        self.proprio_proj = nn.Linear(self.proprio_dim, hidden_dim) if self.proprio_dim > 0 else None
 
         self.time_mlp = nn.Sequential(
             nn.Linear(hidden_dim, int(hidden_dim * mlp_ratio)),
@@ -122,6 +125,7 @@ class FlowActionDiT(nn.Module):
         text_mask: torch.Tensor | None = None,
         physics_code: torch.Tensor | None = None,
         future_latent: torch.Tensor | None = None,
+        proprio: torch.Tensor | None = None,
     ) -> torch.Tensor:
         z = _pool_latent(z_t)
         state_token = self.z_proj(z).unsqueeze(1)
@@ -131,6 +135,17 @@ class FlowActionDiT(nn.Module):
         tokens = [state_token, text_tokens, time_token]
         if physics_code is not None:
             tokens.append(self.physics_proj(physics_code).unsqueeze(1))
+        if self.proprio_proj is not None and proprio is not None:
+            p = proprio.float()
+            if p.dim() == 3:
+                p = p[:, 0]
+            if p.dim() != 2:
+                raise ValueError(f"proprio must be [B,D] or [B,T,D], got {tuple(proprio.shape)}")
+            if p.shape[-1] != self.proprio_dim:
+                raise ValueError(
+                    f"proprio dim {p.shape[-1]} != model proprio_dim {self.proprio_dim}"
+                )
+            tokens.append(self.proprio_proj(p).unsqueeze(1))
         if future_latent is not None:
             future = _pool_latent(future_latent)
             tokens.append(self.future_proj(future).unsqueeze(1))
@@ -145,6 +160,7 @@ class FlowActionDiT(nn.Module):
         text_mask: torch.Tensor | None = None,
         physics_code: torch.Tensor | None = None,
         future_latent: torch.Tensor | None = None,
+        proprio: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Predict velocity v_theta.
@@ -172,7 +188,7 @@ class FlowActionDiT(nn.Module):
             raise ValueError(f"tau batch {tau.shape[0]} != action batch {b}")
 
         cond_tokens = self._build_cond_tokens(
-            z_t, text_emb, tau, text_mask, physics_code, future_latent
+            z_t, text_emb, tau, text_mask, physics_code, future_latent, proprio
         )
         action_tokens = self.action_embed(noisy_action)
         tokens = torch.cat([cond_tokens, action_tokens], dim=1)
@@ -190,6 +206,7 @@ class FlowActionDiT(nn.Module):
         text_mask: torch.Tensor | None = None,
         physics_code: torch.Tensor | None = None,
         future_latent: torch.Tensor | None = None,
+        proprio: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """
         Sample tau/noise if not provided and compute flow-matching MSE loss.
@@ -220,6 +237,7 @@ class FlowActionDiT(nn.Module):
             text_mask=text_mask,
             physics_code=physics_code,
             future_latent=future_latent,
+            proprio=proprio,
         )
         loss = F.mse_loss(v_pred, v_target)
 
@@ -242,6 +260,7 @@ class FlowActionDiT(nn.Module):
         text_mask: torch.Tensor | None = None,
         physics_code: torch.Tensor | None = None,
         future_latent: torch.Tensor | None = None,
+        proprio: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Start from Gaussian action noise at tau=1 and integrate to tau=0.
@@ -272,6 +291,7 @@ class FlowActionDiT(nn.Module):
                 text_mask=text_mask,
                 physics_code=physics_code,
                 future_latent=future_latent,
+                proprio=proprio,
             )
             x = x - dt * v
             if clamp is not None:

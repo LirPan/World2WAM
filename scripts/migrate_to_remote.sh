@@ -135,8 +135,9 @@ case "${1:-check}" in
   code) _remote_mkdir; sync_code; sync_configs_link; sync_conda_env ;;
   cache) _remote_mkdir; sync_version_a_cache ;;
   weights) _remote_mkdir; sync_fastwam_weights ;;
+  data) _remote_mkdir; sync_raw_lerobot ;;
   *)
-    echo "Usage: $0 {check|tier1|tier2|tier3|all|code|cache|weights}"
+    echo "Usage: $0 {check|tier1|tier2|tier3|all|code|cache|weights|data}"
     exit 1
     ;;
 esac
