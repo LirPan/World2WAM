@@ -280,6 +280,7 @@ def compute_cycle_flow_loss(
     action_chunk: torch.Tensor,
     physics_code: torch.Tensor | None = None,
     text_mask: torch.Tensor | None = None,
+    proprio: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """
     Cycle consistency via shared FlowActionDiT inverse path.
@@ -288,13 +289,18 @@ def compute_cycle_flow_loss(
     """
     if not hasattr(action_adapter, "compute_flow_loss"):
         raise TypeError("compute_cycle_flow_loss requires a FlowActionDiT adapter")
+    kwargs: dict = {
+        "text_mask": text_mask,
+        "physics_code": physics_code,
+        "future_latent": z_pred_H,
+    }
+    if proprio is not None:
+        kwargs["proprio"] = proprio
     flow_out = action_adapter.compute_flow_loss(
         z_t=z_t,
         text_emb=text_embed,
         clean_action=action_chunk,
-        text_mask=text_mask,
-        physics_code=physics_code,
-        future_latent=z_pred_H,
+        **kwargs,
     )
     return flow_out["loss"]
 
@@ -392,6 +398,7 @@ def build_action_adapter(
             mlp_ratio=mlp_ratio,
             dropout=dropout,
             physics_dim=physics_dim,
+            proprio_dim=int(act_cfg.get("proprio_dim", 0)),
         )
 
     raise ValueError(f"Unknown adapter_type: {adapter_type}")

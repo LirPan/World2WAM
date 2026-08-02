@@ -22,6 +22,7 @@ from minimal_world2wam.data.latent_cache_dataset import (
     collate_latent_batch,
     detect_state_dim,
     load_meta,
+    require_fastwam_action_in_cache,
     train_val_split,
 )
 from minimal_world2wam.eval.physics_eval_utils import build_student_router
@@ -66,6 +67,11 @@ def main() -> None:
     parser.add_argument("--output_dir", default=None)
     parser.add_argument("--max_steps", type=int, default=None)
     parser.add_argument("--max_samples", type=int, default=None)
+    parser.add_argument(
+        "--indices_file",
+        default=None,
+        help="JSON list of dataset indices (e.g. cache files with fastwam_action only)",
+    )
     parser.add_argument("--batch_size", type=int, default=None)
     parser.add_argument("--adapter_type", choices=["mlp", "light_dit", "flow_dit"], default=None)
     parser.add_argument("--lambda_phase", type=float, default=None)
@@ -97,8 +103,25 @@ def main() -> None:
 
     meta = load_meta(cache_dir)
     state_dim = detect_state_dim(cache_dir)
+    residual_delta = bool(loss_cfg.get("residual_delta", False))
+    if residual_delta:
+        if args.indices_file:
+            print("Version C residual_delta=ON with --indices_file (skip global cache probe).")
+        else:
+            require_fastwam_action_in_cache(cache_dir)
+        print("Version C residual_delta=ON: Flow/Inv/Cycle target δ = a_GT - a_FW; Forward uses absolute GT.")
     dataset = LatentCacheDataset(cache_dir, load_state=state_dim > 0)
-    if args.max_samples is not None and args.max_samples < len(dataset):
+    if args.indices_file:
+        indices_path = _resolve(args.indices_file)
+        if indices_path is None or not indices_path.is_file():
+            raise FileNotFoundError(f"--indices_file not found: {args.indices_file}")
+        with open(indices_path, encoding="utf-8") as f:
+            subset_indices = json.load(f)
+        if not isinstance(subset_indices, list) or not subset_indices:
+            raise ValueError(f"--indices_file must contain a non-empty JSON list: {indices_path}")
+        dataset = Subset(dataset, subset_indices)
+        print(f"Using {len(subset_indices)} samples from {indices_path}")
+    elif args.max_samples is not None and args.max_samples < len(dataset):
         dataset = Subset(dataset, list(range(args.max_samples)))
 
     train_ds, _val_ds = train_val_split(
@@ -224,10 +247,12 @@ def main() -> None:
                 for k in (
                     "loss_flow", "loss_fwd", "loss_inverse", "loss_cycle",
                     "loss_phase", "loss_phy", "phase_acc_pseudo", "phase_entropy",
+                    "delta_abs_mean",
                 ):
                     if k in losses:
                         v = losses[k]
                         rec[k] = float(v.item()) if hasattr(v, "item") else float(v)
+                rec["residual_delta"] = bool(loss_cfg.get("residual_delta", False))
                 if is_flow_adapter(action_adapter) and global_step % (log_every * 2) == 0:
                     with torch.no_grad():
                         router_out = physics_router(
@@ -242,9 +267,18 @@ def main() -> None:
                             num_steps=flow_sample_steps,
                             physics_code=router_out.get("physics_code"),
                         )
+                        from minimal_world2wam.train.training_utils import resolve_action_flow_target
+
+                        target = resolve_action_flow_target(batch_dev, cfg)
                         rec["mse_act_sample"] = float(
-                            torch.nn.functional.mse_loss(sampled, batch_dev["action_chunk"]).item()
+                            torch.nn.functional.mse_loss(sampled, target).item()
                         )
+                        if "fastwam_action" in batch_dev:
+                            # Reconstructed absolute action vs GT (sanity for residual mode).
+                            abs_pred = batch_dev["fastwam_action"] + sampled
+                            rec["mse_abs_recon"] = float(
+                                torch.nn.functional.mse_loss(abs_pred, batch_dev["action_chunk"]).item()
+                            )
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(rec) + "\n")
                 pbar.set_postfix(loss=f"{rec['loss']:.4f}")

@@ -51,6 +51,8 @@ class LatentCacheDataset(Dataset):
                 for k in ("task_id", "episode_id", "t", "transition_idx", "clip_idx")
             },
         }
+        if "fastwam_action" in payload and payload["fastwam_action"] is not None:
+            sample["fastwam_action"] = payload["fastwam_action"].float()
         if self.load_state:
             if "state_t" in payload:
                 sample["state_t"] = payload["state_t"].float()
@@ -82,11 +84,36 @@ def collate_latent_batch(samples: list[dict[str, Any]]) -> dict[str, Any]:
         "action_chunk": torch.stack([s["action_chunk"] for s in samples], dim=0),
         "metadata": [s["metadata"] for s in samples],
     }
+    if "fastwam_action" in samples[0]:
+        if not all("fastwam_action" in s for s in samples):
+            raise KeyError(
+                "Partial batch missing fastwam_action. "
+                "Re-run scripts/precompute_fastwam_actions.py with --resume."
+            )
+        batch["fastwam_action"] = torch.stack([s["fastwam_action"] for s in samples], dim=0)
     if "state_t" in samples[0]:
         batch["state_t"] = torch.stack([s["state_t"] for s in samples], dim=0)
     if "state_tH" in samples[0]:
         batch["state_tH"] = torch.stack([s["state_tH"] for s in samples], dim=0)
     return batch
+
+
+def require_fastwam_action_in_cache(cache_dir: str | Path, *, probe: int = 32) -> None:
+    """Raise if residual training cache lacks fastwam_action on probed files."""
+    files = list_cache_files(cache_dir)
+    missing = 0
+    checked = 0
+    for fp in files[: max(probe, 1)]:
+        payload = torch.load(fp, map_location="cpu", weights_only=False)
+        checked += 1
+        if "fastwam_action" not in payload or payload["fastwam_action"] is None:
+            missing += 1
+    if missing:
+        raise FileNotFoundError(
+            f"loss.residual_delta=true but {missing}/{checked} probed cache files under "
+            f"{cache_dir} lack fastwam_action. Run: "
+            "python minimal_world2wam/scripts/precompute_fastwam_actions.py --resume"
+        )
 
 
 def detect_state_dim(cache_dir: str | Path) -> int:

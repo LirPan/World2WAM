@@ -21,8 +21,9 @@ def call_action_adapter(
     physics_code: torch.Tensor | None = None,
     text_mask: torch.Tensor | None = None,
     future_latent: torch.Tensor | None = None,
+    proprio: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    """Call action adapter; pass physics_code when supported."""
+    """Call action adapter; pass physics_code / proprio when supported."""
     kwargs: dict[str, Any] = {}
     if physics_code is not None:
         kwargs["physics_code"] = physics_code
@@ -30,12 +31,15 @@ def call_action_adapter(
         kwargs["text_mask"] = text_mask
     if future_latent is not None and is_flow_adapter(adapter):
         kwargs["future_latent"] = future_latent
+    if proprio is not None:
+        kwargs["proprio"] = proprio
 
     if kwargs:
         try:
             return adapter(z_t, text_embed, **kwargs)
         except TypeError:
             kwargs.pop("future_latent", None)
+            kwargs.pop("proprio", None)
             if kwargs:
                 try:
                     return adapter(z_t, text_embed, **kwargs)
@@ -58,6 +62,7 @@ def sample_action_adapter(
     text_mask: torch.Tensor | None = None,
     physics_code: torch.Tensor | None = None,
     future_latent: torch.Tensor | None = None,
+    proprio: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Sample or predict action chunk; flow adapters use ODE integration."""
     if is_flow_adapter(adapter):
@@ -68,6 +73,8 @@ def sample_action_adapter(
             kwargs["physics_code"] = physics_code
         if future_latent is not None:
             kwargs["future_latent"] = future_latent
+        if proprio is not None:
+            kwargs["proprio"] = proprio
         return adapter.sample(z_t, text_embed, **kwargs)
     return call_action_adapter(
         adapter,
@@ -75,7 +82,28 @@ def sample_action_adapter(
         text_embed,
         physics_code=physics_code,
         text_mask=text_mask,
+        proprio=proprio,
     )
+
+
+def resolve_action_flow_target(batch: dict[str, torch.Tensor], cfg: dict[str, Any]) -> torch.Tensor:
+    """
+    Absolute GT action_chunk by default.
+
+    If loss.residual_delta is true, require batch["fastwam_action"] and train on
+        delta = action_chunk - fastwam_action
+    so eval can do a = a_fastwam + alpha * delta.
+    """
+    action_chunk = batch["action_chunk"]
+    if not bool(cfg.get("loss", {}).get("residual_delta", False)):
+        return action_chunk
+    teacher = batch.get("fastwam_action")
+    if teacher is None:
+        raise KeyError(
+            "loss.residual_delta=true but batch has no fastwam_action. "
+            "Run scripts/precompute_fastwam_actions.py and ensure the dataset loads it."
+        )
+    return action_chunk - teacher
 
 
 def _legacy_inverse_loss(
@@ -126,6 +154,9 @@ def compute_world2wam_losses(
     text_embed = batch["text_embed"]
     action_chunk = batch["action_chunk"]
     text_mask = batch.get("text_mask")
+    proprio = batch.get("state_t")
+    # Flow / MSE targets: absolute GT, or delta vs FastWAM teacher when configured.
+    flow_target = resolve_action_flow_target(batch, cfg)
 
     lambda_fwd = float(weights.get("lambda_fwd", weights.get("lambda_future", 1.0)))
     lambda_inv = float(weights.get("lambda_inv", weights.get("lambda_inverse", 1.0)))
@@ -164,12 +195,14 @@ def compute_world2wam_losses(
             flow_kwargs["physics_code"] = physics_code
         if text_mask is not None:
             flow_kwargs["text_mask"] = text_mask
+        if proprio is not None:
+            flow_kwargs["proprio"] = proprio
 
         if use_act:
             flow_out = action_adapter.compute_flow_loss(
                 z_t=z_t,
                 text_emb=text_embed,
-                clean_action=action_chunk,
+                clean_action=flow_target,
                 **flow_kwargs,
             )
             loss_act = flow_out["loss"]
@@ -184,7 +217,7 @@ def compute_world2wam_losses(
             inv_out = action_adapter.compute_flow_loss(
                 z_t=z_t,
                 text_emb=text_embed,
-                clean_action=action_chunk,
+                clean_action=flow_target,
                 future_latent=z_tH,
                 **flow_kwargs,
             )
@@ -202,15 +235,16 @@ def compute_world2wam_losses(
                 z_t=z_t,
                 z_pred_H=z_for_cycle,
                 text_embed=text_embed,
-                action_chunk=action_chunk,
+                action_chunk=flow_target,
                 physics_code=physics_code,
                 text_mask=text_mask,
+                proprio=proprio,
             )
 
     elif inverse_head is not None:
         if use_inv:
             loss_inv = _legacy_inverse_loss(
-                inverse_head, z_t, z_tH, text_embed, action_chunk, physics_code
+                inverse_head, z_t, z_tH, text_embed, flow_target, physics_code
             )
         if use_cycle:
             if z_pred_H is None:
@@ -220,18 +254,23 @@ def compute_world2wam_losses(
                     z_pred_H = forward_head(z_t, action_chunk, text_embed)
             z_for_cycle = z_pred_H.detach() if cycle_detach else z_pred_H
             loss_cycle = _legacy_inverse_loss(
-                inverse_head, z_t, z_for_cycle, text_embed, action_chunk, physics_code
+                inverse_head, z_t, z_for_cycle, text_embed, flow_target, physics_code
             )
 
         if use_act and action_adapter is not None:
             from minimal_world2wam.models.world2wam_heads import compute_action_loss
 
             pred_act = call_action_adapter(
-                action_adapter, z_t, text_embed, physics_code=physics_code, text_mask=text_mask
+                action_adapter,
+                z_t,
+                text_embed,
+                physics_code=physics_code,
+                text_mask=text_mask,
+                proprio=proprio,
             )
             loss_act = compute_action_loss(
                 pred_act,
-                action_chunk,
+                flow_target,
                 mode=str(loss_cfg.get("action_loss_mode", "mse")),
             )
             act_weight = lambda_act
@@ -253,6 +292,9 @@ def compute_world2wam_losses(
         "loss_act": loss_act.detach(),
         "loss_flow": loss_act.detach(),
     }
+    if bool(loss_cfg.get("residual_delta", False)):
+        result["delta_abs_mean"] = flow_target.detach().abs().mean()
+        result["residual_delta"] = torch.ones((), device=device)
     result.update(flow_metrics)
     return result
 
@@ -422,9 +464,23 @@ def load_checkpoint(
                 f"(checkpoint type={ckpt_type}, expected={expected_adapter_type})"
             )
         else:
-            action_adapter.load_state_dict(payload["action_adapter"])
+            ad_result = action_adapter.load_state_dict(payload["action_adapter"], strict=False)
+            if ad_result.missing_keys or ad_result.unexpected_keys:
+                print(
+                    f"Warning: action_adapter load from {path}: "
+                    f"missing={ad_result.missing_keys} unexpected={ad_result.unexpected_keys}"
+                )
+    elif action_adapter is not None:
+        print(f"Warning: checkpoint {path} has no action_adapter weights")
     if physics_router is not None and "physics_router" in payload:
-        physics_router.load_state_dict(payload["physics_router"], strict=False)
+        pr_result = physics_router.load_state_dict(payload["physics_router"], strict=False)
+        if pr_result.missing_keys or pr_result.unexpected_keys:
+            print(
+                f"Warning: physics_router load from {path}: "
+                f"missing={pr_result.missing_keys} unexpected={pr_result.unexpected_keys}"
+            )
+    elif physics_router is not None:
+        print(f"Warning: checkpoint {path} has no physics_router weights (state_dim mismatch risk)")
     return payload
 
 

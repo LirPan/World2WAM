@@ -3,7 +3,7 @@
 # Designed for GPU polling wrapper (poll_gpu_version_a.sh) or direct run on a free GPU.
 set -euo pipefail
 
-WORKSPACE="/DATA/disk0/jianhua"
+WORKSPACE="${WORKSPACE:-/DATA/disk0/jianhua}"
 CONFIG="${CONFIG:-configs/world2wam_physics_flow_dit_main.yaml}"
 CACHE_OUT="${CACHE_OUT:-cache/libero_spatial_h10_full_fastwam}"
 OUT_DIR="${OUT_DIR:-experiments/world2wam_physics_flow_dit_main}"
@@ -25,15 +25,15 @@ TRAIN_GPU_MAX_UTIL="${TRAIN_GPU_MAX_UTIL:-25}"
 EVAL_GPU_FREE_MIN_MB="${EVAL_GPU_FREE_MIN_MB:-30000}"
 EVAL_GPU_MAX_UTIL="${EVAL_GPU_MAX_UTIL:-30}"
 
-source /DATA/disk0/jianhua/miniconda3/etc/profile.d/conda.sh
+source "${WORKSPACE}/miniconda3/etc/profile.d/conda.sh" 2>/dev/null || source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate world2wam
 export PYTHONPATH="${WORKSPACE}:${PYTHONPATH:-}"
 unset PYTHONHOME
 export MUJOCO_GL=egl
 
-if [[ -f /DATA/disk0/jianhua/use_proxy.sh ]]; then
+if [[ -f "${WORKSPACE}/use_proxy.sh" ]]; then
   # shellcheck disable=SC1091
-  source /DATA/disk0/jianhua/use_proxy.sh || true
+  source "${WORKSPACE}/use_proxy.sh" || true
 fi
 
 # shellcheck disable=SC1091

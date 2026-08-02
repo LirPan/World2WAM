@@ -12,7 +12,7 @@
 #   GPU_POLL_SEC (default 120), TRAIN_GPU_FREE_MIN_MB, PRECOMPUTE_GPU_FREE_MIN_MB
 set -euo pipefail
 
-WORKSPACE="/DATA/disk0/jianhua"
+WORKSPACE="${WORKSPACE:-/DATA/disk0/jianhua}"
 JOB_DIR="${WORKSPACE}/cache/bg_jobs"
 JOB_NAME="version_a_poll"
 PIDFILE="${JOB_DIR}/${JOB_NAME}.pid"
@@ -115,7 +115,7 @@ case "${1:-start}" in
       EVAL_GPU_FREE_MIN_MB='${EVAL_GPU_FREE_MIN_MB:-30000}'
       export CONFIG CACHE_OUT OUT_DIR MAX_SAMPLES MAX_TASKS NUM_TRIALS
       export GPU_POLL_SEC PRECOMPUTE_GPU_FREE_MIN_MB TRAIN_GPU_FREE_MIN_MB EVAL_GPU_FREE_MIN_MB
-      source /DATA/disk0/jianhua/miniconda3/etc/profile.d/conda.sh
+      source \"\${WORKSPACE}/miniconda3/etc/profile.d/conda.sh\" 2>/dev/null || source \"\$(conda info --base)/etc/profile.d/conda.sh\"
       conda activate world2wam
       export PYTHONPATH=\"\${WORKSPACE}:\${PYTHONPATH:-}\"
       $(declare -f _run_poll_loop)

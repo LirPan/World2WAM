@@ -187,7 +187,10 @@ class FastWAMEncoder(nn.Module):
         self.model.eval()
         video = batch.get("video")
         if video is None:
-            obs = batch.get("obs") or batch.get("obs_t")
+            # Do NOT use `or` on Tensors (Boolean value ambiguous).
+            obs = batch.get("obs")
+            if obs is None:
+                obs = batch.get("obs_t")
             if obs is None:
                 raise ValueError("infer_action_only requires video or obs/obs_t.")
             video = obs
@@ -204,16 +207,24 @@ class FastWAMEncoder(nn.Module):
         if frame.dim() == 3:
             frame = frame.unsqueeze(0)
 
-        prompt = batch.get("prompt") or batch.get("instruction") or batch.get("language")
+        prompt = batch.get("prompt")
+        if prompt is None:
+            prompt = batch.get("instruction")
+        if prompt is None:
+            prompt = batch.get("language")
         if isinstance(prompt, list):
             prompt = prompt[0]
 
         context = batch.get("context")
         context_mask = batch.get("context_mask")
-        proprio = batch.get("proprio") or batch.get("state_t")
+        proprio = batch.get("proprio")
+        if proprio is None:
+            proprio = batch.get("state_t")
         action_horizon = batch.get("action_horizon")
         if action_horizon is None:
-            ac = batch.get("action_chunk") or batch.get("action")
+            ac = batch.get("action_chunk")
+            if ac is None:
+                ac = batch.get("action")
             action_horizon = int(ac.shape[-2]) if ac is not None and ac.dim() >= 2 else 8
 
         infer_kwargs: dict[str, Any] = {

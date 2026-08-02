@@ -168,8 +168,13 @@ def evaluate(
             z_pred = forward_head(z_t, action_chunk, text_embed)
             pred_a = out.get("pred_action")
             pred_act = pred_a
-            logits = out.get("phase_logits") or out.get("physics_logits")
-            probs = out.get("phase_prob") or out.get("physics_probs")
+            # Prefer phase_logits; do NOT use `or` on Tensors (Boolean ambiguous).
+            logits = out.get("phase_logits")
+            if logits is None:
+                logits = out.get("physics_logits")
+            probs = out.get("phase_prob")
+            if probs is None:
+                probs = out.get("physics_probs")
             if logits is not None and probs is not None:
                 label_out = batch_infer_physics_labels_v1(batch, cfg=physics_cfg)
                 phase_acc_sum += (logits.argmax(dim=-1) == label_out["phase_id"]).float().mean().item()
