@@ -1,0 +1,23 @@
+{
+  "status": "validation_only",
+  "protocol": {
+    "groups": 4,
+    "tasks_per_group": 5,
+    "episodes_per_method_per_task": 10,
+    "clean_episodes": 5,
+    "random_episodes": 5,
+    "paired_methods": ["R0", "R3"]
+  },
+  "groups": {
+    "fixed5": {"R0": {"clean": 0.72, "random": 0.60, "avg": 0.66}, "R3": {"clean": 0.72, "random": 0.64, "avg": 0.68}},
+    "next5B": {"R0": {"clean": 0.68, "random": 0.72, "avg": 0.70}, "R3": {"clean": 0.68, "random": 0.70, "avg": 0.69}},
+    "next5C": {"R0": {"clean": 0.66, "random": 0.64, "avg": 0.65}, "R3": {"clean": 0.70, "random": 0.66, "avg": 0.68}},
+    "next5D": {"R0": {"clean": 0.64, "random": 0.62, "avg": 0.63}, "R3": {"clean": 0.66, "random": 0.56, "avg": 0.61}}
+  },
+  "four_group_mean": {
+    "R0": {"clean": 0.675, "random": 0.645, "avg": 0.660},
+    "R3": {"clean": 0.690, "random": 0.640, "avg": 0.665},
+    "delta_R3_minus_R0": {"clean": 0.015, "random": -0.005, "avg": 0.005}
+  },
+  "interpretation": "R3 shows a small positive validation signal overall; this is not the full RoboTwin benchmark."
+}

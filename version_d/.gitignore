@@ -1,0 +1,11 @@
+# Large or machine-local artifacts must stay outside the repository.
+checkpoints/
+data/
+cache/
+runs/
+*.pt
+*.safetensors
+*.tar.gz
+*.tar.gz.part-*
+__pycache__/
+.DS_Store
