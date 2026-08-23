@@ -242,7 +242,12 @@ main() {
   local status=0 pid
   for pid in "$pid0" "$pid1" "$pid2" "$pid3"; do wait "$pid" || status=1; done
   "$PY" "$ROOT/deploy/tools/summarize_matrix.py" --root "$RUN" || status=1
-  if [[ "$status" -eq 0 ]]; then state supervisor.state "complete"; else state supervisor.state "completed_with_failures"; fi
+  if [[ "$status" -eq 0 ]]; then
+    touch "$RUN/status/robotwin_complete"
+    state supervisor.state "complete"
+  else
+    state supervisor.state "completed_with_failures"
+  fi
   return "$status"
 }
 

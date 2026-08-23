@@ -43,9 +43,23 @@ Relative to R0, R3 is +1.5 percentage points on clean episodes, -0.5 points on r
 
 The paths in the YAML and supervisor intentionally match the current yjh server layout. Change only the server-root variables and data/checkpoint paths when porting to another machine. Do not commit checkpoints, datasets, credentials, or server handoff notes.
 
+## LIBERO Version D adaptation
+
+`configs/libero_version_d_fiveages.yaml` is the LIBERO-specific 7D recipe. It
+keeps the F/I/C losses and `project_conflicts` gradient merge, while using the
+official LIBERO 2-camera/224 FastWAM interface. It is intentionally separate
+from the RoboTwin 14D checkpoint and must be trained/exported before LIBERO
+simulation evaluation.
+
+After the RobotWin supervisor writes `status/robotwin_complete`, run
+`scripts/libero_version_d_after_robotwin.sh`. The script precomputes the
+future-latent cache, trains and exports Version D, evaluates official FastWAM
+and Version D on the same fixed LIBERO-Spatial task IDs and seeds, then writes
+`libero_pair_summary.json`. It does not select tasks, seeds, or failed trials
+after seeing results.
+
 If a mirror requires a SOCKS5 proxy, set `ROBOTWIN_SOCKS_PROXY` in the server environment; the supervisor defaults to a local proxy and does not embed an internal host address.
 
 ## Evaluation protocol
 
 R0 and R3 must use the same task list, episode count, clean/random split, simulator settings, and evaluator. Preserve each evaluator output directory, especially `summary.json`, together with the command and return code. Smoke tests with three episodes are useful for debugging but must not be mixed with the paired validation table.
-

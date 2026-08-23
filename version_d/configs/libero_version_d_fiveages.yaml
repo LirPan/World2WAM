@@ -1,0 +1,73 @@
+# Version D adapted to LIBERO.
+# This recipe keeps the same F/I/C + conflict-projection objective as the
+# RoboTwin recipe, but uses the official LIBERO 2-camera / 7D interface.
+# Paths below target the current FiveAges server and must be changed when
+# porting to another machine.
+project_name: world2wam_version_d_libero
+experiment_role: version_d_libero
+
+fastwam_root: /DATA/disk0/jianhua/_shared/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM
+libero_root: /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/code/LIBERO_fresh
+fastwam_task_config: libero_uncond_2cam224_1e-4
+official_fastwam_checkpoint: /DATA/disk0/jianhua/_shared/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt
+checkpoint_path: /DATA/disk0/jianhua/_shared/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224.pt
+dataset_stats_path: /DATA/disk0/jianhua/_shared/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM/checkpoints/fastwam_release/libero_uncond_2cam224_dataset_stats.json
+
+backbone_mode: lora
+lora_rank: 8
+lora_alpha: 16
+lora_target_modules: [q, k, v, o]
+
+policy_action_only_loss: true
+use_future_latent_distill: true
+train_future_head: true
+use_gt_action_for_future_head: true
+use_target_future_for_inverse_head: true
+enable_inverse: true
+enable_cycle: true
+
+# Version D objective: action + future + inverse + cycle.
+lambda_action: 1.0
+lambda_fwd: 0.1
+lambda_inv: 0.05
+lambda_cycle: 0.05
+world_loss_scale: 1.0
+world_gradient_mode: project_conflicts
+gradient_log_every: 100
+future_loss_warmup_steps: 500
+
+future_horizon: 1
+future_latent_dim: 48
+hidden_dim: 1024
+action_dim: 7
+inverse_hidden_size: 1024
+
+# Fixed before evaluation; no task/seed selection is performed at test time.
+# These phrases are LIBERO training prompts, not evaluation filters.
+hard_sample_fraction: 0.5
+hard_task_keywords:
+  - "next to the ramekin"
+  - "on the cookie box"
+  - "top drawer of the wooden cabinet"
+  - "on the ramekin"
+  - "on the stove"
+  - "next to the plate"
+
+batch_size: 2
+num_epochs: 2
+lr: 1.0e-4
+backbone_lr: 5.0e-5
+seed: 42
+num_workers: 2
+device: cuda
+mixed_precision: bf16
+log_every: 20
+save_every: 500
+keep_last_checkpoints: 3
+max_train_steps: 6000
+precompute_max_samples: 12000
+
+lerobot_dataset_dirs:
+  - /DATA/disk0/jianhua/plr/yjh_space_backup_20250602/idea2_workspace/code/FastWAM/data/libero_mujoco3.3.2/libero_spatial_no_noops_lerobot
+cache_dir: /DATA/disk0/jianhua/latest/cache/libero_version_d_future_latents
+output_dir: /DATA/disk0/jianhua/latest/experiments/iclr_2027/libero_version_d/train
