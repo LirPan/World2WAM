@@ -1,0 +1,167 @@
+{
+  "protocol": "official_robotwin_standard_no_graph_lite",
+  "episodes": 10,
+  "gpus": [
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "tasks": [
+    "beat_block_hammer",
+    "move_stapler_pad",
+    "pick_dual_bottles",
+    "place_dual_shoes",
+    "press_stapler",
+    "put_object_cabinet",
+    "stack_blocks_three",
+    "stack_bowls_three",
+    "stamp_seal",
+    "turn_switch"
+  ],
+  "checkpoints": {
+    "R0_standard": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/checkpoints/fastwam_release/robotwin_uncond_3cam_384.pt",
+    "R3_standard": "/DATA/disk0/yjh/robotwin_w2wam/checkpoints/R3_lora_fic_merged.pt"
+  },
+  "started_at": "2026-08-25T22:04:36+08:00",
+  "finished_at": "2026-08-25T23:53:07+08:00",
+  "failures": [
+    {
+      "method": "R3_standard",
+      "task": "beat_block_hammer",
+      "phase": "random",
+      "return_code": 1
+    },
+    {
+      "method": "R0_standard",
+      "task": "beat_block_hammer",
+      "phase": "random",
+      "return_code": 1
+    },
+    {
+      "method": "R3_standard",
+      "task": "press_stapler",
+      "phase": "random",
+      "return_code": 1
+    }
+  ],
+  "summaries": {
+    "R0_standard": {
+      "checkpoint": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/checkpoints/fastwam_release/robotwin_uncond_3cam_384.pt",
+      "graph_lite": false,
+      "clean": 0.47000000000000003,
+      "random": 0.4222222222222223,
+      "per_task": [
+        {
+          "task_name": "beat_block_hammer",
+          "clean_success_rate": 0.9,
+          "random_success_rate": null
+        },
+        {
+          "task_name": "move_stapler_pad",
+          "clean_success_rate": 0.4,
+          "random_success_rate": 0.4
+        },
+        {
+          "task_name": "pick_dual_bottles",
+          "clean_success_rate": 0.9,
+          "random_success_rate": 0.8
+        },
+        {
+          "task_name": "place_dual_shoes",
+          "clean_success_rate": 0.1,
+          "random_success_rate": 0.1
+        },
+        {
+          "task_name": "press_stapler",
+          "clean_success_rate": 0.2,
+          "random_success_rate": 0.0
+        },
+        {
+          "task_name": "put_object_cabinet",
+          "clean_success_rate": 0.1,
+          "random_success_rate": 0.3
+        },
+        {
+          "task_name": "stack_blocks_three",
+          "clean_success_rate": 0.1,
+          "random_success_rate": 0.1
+        },
+        {
+          "task_name": "stack_bowls_three",
+          "clean_success_rate": 0.6,
+          "random_success_rate": 0.8
+        },
+        {
+          "task_name": "stamp_seal",
+          "clean_success_rate": 0.8,
+          "random_success_rate": 0.7
+        },
+        {
+          "task_name": "turn_switch",
+          "clean_success_rate": 0.6,
+          "random_success_rate": 0.6
+        }
+      ]
+    },
+    "R3_standard": {
+      "checkpoint": "/DATA/disk0/yjh/robotwin_w2wam/checkpoints/R3_lora_fic_merged.pt",
+      "graph_lite": false,
+      "clean": 0.54,
+      "random": 0.45,
+      "per_task": [
+        {
+          "task_name": "beat_block_hammer",
+          "clean_success_rate": 0.9,
+          "random_success_rate": null
+        },
+        {
+          "task_name": "move_stapler_pad",
+          "clean_success_rate": 0.2,
+          "random_success_rate": 0.4
+        },
+        {
+          "task_name": "pick_dual_bottles",
+          "clean_success_rate": 0.9,
+          "random_success_rate": 0.8
+        },
+        {
+          "task_name": "place_dual_shoes",
+          "clean_success_rate": 0.2,
+          "random_success_rate": 0.2
+        },
+        {
+          "task_name": "press_stapler",
+          "clean_success_rate": 0.2,
+          "random_success_rate": null
+        },
+        {
+          "task_name": "put_object_cabinet",
+          "clean_success_rate": 0.4,
+          "random_success_rate": 0.5
+        },
+        {
+          "task_name": "stack_blocks_three",
+          "clean_success_rate": 0.2,
+          "random_success_rate": 0.2
+        },
+        {
+          "task_name": "stack_bowls_three",
+          "clean_success_rate": 0.8,
+          "random_success_rate": 0.5
+        },
+        {
+          "task_name": "stamp_seal",
+          "clean_success_rate": 0.8,
+          "random_success_rate": 0.6
+        },
+        {
+          "task_name": "turn_switch",
+          "clean_success_rate": 0.8,
+          "random_success_rate": 0.4
+        }
+      ]
+    }
+  }
+}

@@ -9,3 +9,7 @@ runs/
 *.tar.gz.part-*
 __pycache__/
 .DS_Store
+
+# Dated local meeting drafts may contain stale result cutoffs.  Promote a
+# reviewed version under a stable filename before committing it.
+docs/World2WAM_Version_D_ICRA_*_*.docx

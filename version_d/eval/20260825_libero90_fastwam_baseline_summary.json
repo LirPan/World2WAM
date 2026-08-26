@@ -1,0 +1,15 @@
+{
+  "method": "Fast-WAM official baseline",
+  "checkpoint": "libero_uncond_2cam224.pt",
+  "task_suite": "libero_90",
+  "task_count": 90,
+  "episodes_per_task": 50,
+  "episodes": 4500,
+  "successes": 681,
+  "success_rate": 0.15133333333333332,
+  "completed_at": "2026-08-25T18:29:35+08:00",
+  "host": "fiveages-A100-3",
+  "source_result_dir": "/DATA/disk0/yjh/libero_work_wj/runs/eval_libero90_20260825_111045/libero_90",
+  "aggregation_note": "Recomputed directly from all 90 *_results.json files. The old _libero90_final_agg.txt pointed at a stale directory and incorrectly reported 0/0.",
+  "version_d_status": "Not trained or evaluated on LIBERO yet. Ten task text embeddings were precomputed on 2026-08-25."
+}

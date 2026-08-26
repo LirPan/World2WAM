@@ -2,6 +2,22 @@
 
 Version D records the current RoboTwin improvement method and its reproducible evaluation entry points.
 
+## 2026-08-27 status
+
+The latest strict, no-GraphLite RoboTwin hard-10 pair uses 10 episodes per
+task.  Version D improves clean success from 47% to 54% (+7 percentage
+points).  Random evaluation is not yet complete: on the eight tasks with
+results for both methods, R0 is 47.5% and Version D is 45.0%.  Three failed
+simulator jobs must be rerun before reporting the random aggregate.
+
+The official Fast-WAM LIBERO-90 baseline completed 90 tasks and 4,500
+episodes, with 681 successes (15.13%).  LIBERO Version D has not yet been
+trained or evaluated; only the first text-embedding preparation step is
+complete.
+
+See `docs/OFFLINE_HANDOFF_20260827.md` for the exact evidence, exclusions,
+resume commands, paper checklist, and benchmark migration plan.
+
 ## What changed
 
 The official FastWAM checkpoint remains the frozen R0 baseline. Version D adds a parameter-efficient LoRA adaptation and a small future-latent prediction branch:
@@ -18,7 +34,7 @@ The current loss weights are:
 L = 1.00 L_action + 0.10 L_forward + 0.05 L_inverse + 0.05 L_cycle
 ```
 
-## Current validation result
+## Historical four-group validation result
 
 The latest paired validation contains four groups, each with 5 tasks and 10 episodes per method (5 clean + 5 random per task). It is a validation matrix, not the full RoboTwin benchmark.
 
@@ -35,11 +51,21 @@ Relative to R0, R3 is +1.5 percentage points on clean episodes, -0.5 points on r
 ## Reproduction entry points
 
 - `configs/robotwin_r3_lora_fic_projection.yaml`: training and data configuration.
+- `runtime/policy_lora/src/`: exact server-side training runtime snapshot
+  for F/I/C losses, LoRA adaptation, and conflict projection.
 - `scripts/new_yjh_robotwin_supervisor.sh`: non-invasive server supervisor for environment setup, asset preparation, cache generation, training, export, and evaluation.
+- `scripts/run_robotwin_hard10_parallel_new_yjh.py`: resume-safe strict
+  hard-10 evaluation with matched-denominator reporting.
+- `scripts/run_libero_version_d_new_yjh.sh`: resume-safe LIBERO-Spatial
+  train/export/paired-evaluation pipeline for New_yjh.
 - `tools/eval_robotwin_physical.py`: physical RoboTwin evaluation wrapper.
 - `tools/audit_robotwin_tasks.py`: task-set audit and hard-task selection evidence.
 - `tools/summarize_matrix.py`: converts evaluator `summary.json` files into a comparison CSV.
+- `tools/analyze_paired_results.py`: recomputes R0/Version D rates only on
+  tasks completed by both methods.
 - `docs/teacher_explanation.docx`: teacher-facing explanation of the method and current results.
+- `docs/OFFLINE_HANDOFF_20260827.md`: direct continuation guide for offline
+  paper work and the next server session.
 
 The paths in the YAML and supervisor intentionally match the current yjh server layout. Change only the server-root variables and data/checkpoint paths when porting to another machine. Do not commit checkpoints, datasets, credentials, or server handoff notes.
 

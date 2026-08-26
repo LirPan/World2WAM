@@ -1,0 +1,188 @@
+{
+  "label": "R4_lora_fic_p100_hard10_n2_both",
+  "checkpoint": "/DATA/disk0/yjh/robotwin_w2wam/checkpoints/R4_lora_fic_merged.pt",
+  "gpu_id": 6,
+  "episodes": 2,
+  "phase": "both",
+  "tasks": [
+    "beat_block_hammer",
+    "move_stapler_pad",
+    "pick_dual_bottles",
+    "place_dual_shoes",
+    "press_stapler",
+    "put_object_cabinet",
+    "stack_blocks_three",
+    "stack_bowls_three",
+    "stamp_seal",
+    "turn_switch"
+  ],
+  "aggregate": {
+    "clean": 0.45,
+    "rand": 0.3,
+    "avg": 0.375
+  },
+  "rows": [
+    {
+      "task": "beat_block_hammer",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/beat_block_hammer/_result_clean.txt",
+      "success": 0.5,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/beat_block_hammer_clean.log"
+    },
+    {
+      "task": "move_stapler_pad",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/move_stapler_pad/_result_clean.txt",
+      "success": 0.5,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/move_stapler_pad_clean.log"
+    },
+    {
+      "task": "pick_dual_bottles",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/pick_dual_bottles/_result_clean.txt",
+      "success": 1.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/pick_dual_bottles_clean.log"
+    },
+    {
+      "task": "place_dual_shoes",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/place_dual_shoes/_result_clean.txt",
+      "success": 0.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/place_dual_shoes_clean.log"
+    },
+    {
+      "task": "press_stapler",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/press_stapler/_result_clean.txt",
+      "success": 0.5,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/press_stapler_clean.log"
+    },
+    {
+      "task": "put_object_cabinet",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/put_object_cabinet/_result_clean.txt",
+      "success": 0.5,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/put_object_cabinet_clean.log"
+    },
+    {
+      "task": "stack_blocks_three",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/stack_blocks_three/_result_clean.txt",
+      "success": 0.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/stack_blocks_three_clean.log"
+    },
+    {
+      "task": "stack_bowls_three",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/stack_bowls_three/_result_clean.txt",
+      "success": 1.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/stack_bowls_three_clean.log"
+    },
+    {
+      "task": "stamp_seal",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/stamp_seal/_result_clean.txt",
+      "success": 0.5,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/stamp_seal_clean.log"
+    },
+    {
+      "task": "turn_switch",
+      "phase": "clean",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/turn_switch/_result_clean.txt",
+      "success": 0.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/turn_switch_clean.log"
+    },
+    {
+      "task": "beat_block_hammer",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/beat_block_hammer/_result_random.txt",
+      "success": 0.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/beat_block_hammer_random.log"
+    },
+    {
+      "task": "move_stapler_pad",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/move_stapler_pad/_result_random.txt",
+      "success": 0.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/move_stapler_pad_random.log"
+    },
+    {
+      "task": "pick_dual_bottles",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/pick_dual_bottles/_result_random.txt",
+      "success": 0.5,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/pick_dual_bottles_random.log"
+    },
+    {
+      "task": "place_dual_shoes",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/place_dual_shoes/_result_random.txt",
+      "success": 0.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/place_dual_shoes_random.log"
+    },
+    {
+      "task": "press_stapler",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/press_stapler/_result_random.txt",
+      "success": 0.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/press_stapler_random.log"
+    },
+    {
+      "task": "put_object_cabinet",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/put_object_cabinet/_result_random.txt",
+      "success": 0.5,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/put_object_cabinet_random.log"
+    },
+    {
+      "task": "stack_blocks_three",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/stack_blocks_three/_result_random.txt",
+      "success": 0.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/stack_blocks_three_random.log"
+    },
+    {
+      "task": "stack_bowls_three",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/stack_bowls_three/_result_random.txt",
+      "success": 0.5,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/stack_bowls_three_random.log"
+    },
+    {
+      "task": "stamp_seal",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/stamp_seal/_result_random.txt",
+      "success": 1.0,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/stamp_seal_random.log"
+    },
+    {
+      "task": "turn_switch",
+      "phase": "random",
+      "returncode": 0,
+      "result_file": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/evaluate_results/robotwin/R4_lora_fic_merged/R4_lora_fic_p100_hard10_n2_both/turn_switch/_result_random.txt",
+      "success": 0.5,
+      "log": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_lora_fic_r4_anchor_train/eval/R4_lora_fic_p100_hard10_n2_both/turn_switch_random.log"
+    }
+  ],
+  "hard_metrics": null,
+  "hard_metrics_note": "Not populated: this evaluator has no verified official hard-task partition."
+}

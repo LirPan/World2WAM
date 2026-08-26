@@ -1,0 +1,112 @@
+{
+  "protocol": "official_robotwin_standard_no_graph_lite",
+  "episodes": 3,
+  "gpu_id": 1,
+  "tasks": [
+    "adjust_bottle",
+    "beat_block_hammer",
+    "blocks_ranking_rgb",
+    "blocks_ranking_size",
+    "click_alarmclock"
+  ],
+  "summaries": [
+    {
+      "label": "validation",
+      "method": "R0_standard",
+      "checkpoint": "/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/checkpoints/fastwam_release/robotwin_uncond_3cam_384.pt",
+      "graph_lite": false,
+      "episodes": 3,
+      "tasks": 5,
+      "clean": 0.6,
+      "random": 0.8666666666666666,
+      "per_task": [
+        {
+          "task_name": "adjust_bottle",
+          "clean_success_rate": 0.6666666666666666,
+          "random_success_rate": 1.0,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        },
+        {
+          "task_name": "beat_block_hammer",
+          "clean_success_rate": 0.6666666666666666,
+          "random_success_rate": 1.0,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        },
+        {
+          "task_name": "blocks_ranking_rgb",
+          "clean_success_rate": 0.0,
+          "random_success_rate": 0.6666666666666666,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        },
+        {
+          "task_name": "blocks_ranking_size",
+          "clean_success_rate": 0.6666666666666666,
+          "random_success_rate": 0.6666666666666666,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        },
+        {
+          "task_name": "click_alarmclock",
+          "clean_success_rate": 1.0,
+          "random_success_rate": 1.0,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        }
+      ],
+      "created_at": "2026-08-25T22:55:34+08:00",
+      "host": "fiveages-A100-3"
+    },
+    {
+      "label": "validation",
+      "method": "VersionD_standard",
+      "checkpoint": "/DATA/disk0/yjh/robotwin_w2wam/checkpoints/R3_lora_fic_merged.pt",
+      "graph_lite": false,
+      "episodes": 3,
+      "tasks": 5,
+      "clean": 0.8,
+      "random": 0.7333333333333333,
+      "per_task": [
+        {
+          "task_name": "adjust_bottle",
+          "clean_success_rate": 1.0,
+          "random_success_rate": 0.6666666666666666,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        },
+        {
+          "task_name": "beat_block_hammer",
+          "clean_success_rate": 0.6666666666666666,
+          "random_success_rate": 0.6666666666666666,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        },
+        {
+          "task_name": "blocks_ranking_rgb",
+          "clean_success_rate": 0.3333333333333333,
+          "random_success_rate": 0.6666666666666666,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        },
+        {
+          "task_name": "blocks_ranking_size",
+          "clean_success_rate": 1.0,
+          "random_success_rate": 0.6666666666666666,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        },
+        {
+          "task_name": "click_alarmclock",
+          "clean_success_rate": 1.0,
+          "random_success_rate": 1.0,
+          "clean_return_code": 0,
+          "random_return_code": 0
+        }
+      ],
+      "created_at": "2026-08-25T23:42:34+08:00",
+      "host": "fiveages-A100-3"
+    }
+  ]
+}

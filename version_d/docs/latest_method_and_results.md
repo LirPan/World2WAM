@@ -1,5 +1,10 @@
 # Version D：最新方法与结果说明
 
+> 状态更新（2026-08-27）：本文下方的四组矩阵是历史validation。
+> 最新标准协议结果、LIBERO-90 baseline、失败项和续跑命令见
+> [OFFLINE_HANDOFF_20260827.md](OFFLINE_HANDOFF_20260827.md)。当前最可信结果为
+> RoboTwin hard-10 clean：R0 47%，Version D 54%；random尚未完整闭环。
+
 ## 一句话概括
 
 Version D 没有重做整个 FastWAM，而是在官方 FastWAM 权重上增加一个轻量 LoRA 适配层，并用“未来状态表征预测 + 正向/逆向/循环一致性”约束训练；同时用梯度冲突投影保护主任务动作学习。
@@ -70,4 +75,3 @@ R3 当前配置为：3000 steps、batch size 1、learning rate `1e-4`、bf16、f
 2. 保存每组 R0/R3 的原始 `summary.json`、CSV 和运行返回码。
 3. 分别报告 clean、random、hard-task 子集，避免只报一个平均数。
 4. 若 random 下降继续存在，优先检查困难任务过采样比例、LoRA scale 和 FIC loss 权重，再做单变量 ablation。
-
