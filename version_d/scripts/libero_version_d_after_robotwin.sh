@@ -81,8 +81,13 @@ if [[ ! -f "$MERGED_CKPT" ]]; then
 fi
 
 run_eval() {
-  local label="$1" ckpt="$2" out="$3" task_id
+  local label="$1" ckpt="$2" out="$3" task_id result
   for task_id in $TASK_IDS; do
+    result="$out/libero_spatial/gpu0_task${task_id}_results.json"
+    if [[ -s "$result" ]]; then
+      log "Skipping completed ${label}: task=${task_id}, result=${result}"
+      continue
+    fi
     log "Evaluating ${label}: task=${task_id}, trials=${NUM_TRIALS}, seed=${SEED}"
     CUDA_VISIBLE_DEVICES="$EVAL_GPU" xvfb-run -a "$PY" "$EVAL_SCRIPT" \
       "ckpt=$ckpt" \
