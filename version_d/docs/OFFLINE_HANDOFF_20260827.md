@@ -408,5 +408,6 @@ RoboCasa365规模大、任务长且科学价值高，但包含大量厨房任务
 ## 9. 2026-08-27 晚间恢复运行记录
 
 - New_yjh 已部署 `wait_and_run_priority_new_yjh.sh`：检测到真正空闲 GPU 后，先补齐 RoboTwin hard10 的3个缺失随机化任务，再执行LIBERO-Spatial Version D小规模pilot。两个阶段均支持断点续跑。
+- New_yjh 队列默认每10秒扫描全部8张卡；FiveAges 的 Version D 队列也默认每10秒扫描全部8张卡，只在显存不超过1GB且GPU利用率不超过5%时接管空闲卡。它不会抢占或终止别人的活动进程。
 - FiveAges 的LIBERO90评测发现PyTorch 2.6+兼容问题：`torch.load`默认启用`weights_only=True`，导致可信的LIBERO初始状态文件无法反序列化。两台服务器均已将该调用改为显式`weights_only=False`。
 - 可复用补丁位于 `version_d/patches/libero_torch26_weights_only.patch`。该参数只应对项目自带、来源可信的LIBERO init-state文件使用。

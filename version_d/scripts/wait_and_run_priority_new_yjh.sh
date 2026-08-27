@@ -17,7 +17,7 @@ LOG="${PRIORITY_LOG:-$LIBERO_WORK/runs/world2wam_priority_queue.log}"
 LOCK="${PRIORITY_LOCK:-/tmp/world2wam_priority_new_yjh.lock}"
 IDLE_MEM_MB="${IDLE_MEM_MB:-1000}"
 IDLE_UTIL="${IDLE_UTIL:-5}"
-POLL_SECONDS="${POLL_SECONDS:-45}"
+POLL_SECONDS="${POLL_SECONDS:-10}"
 
 mkdir -p "$(dirname "$LOG")"
 exec 9>"$LOCK"
@@ -93,6 +93,25 @@ else
   bash "$LIBERO_RUNNER"
   rc=$?
   log "LIBERO Version D pilot exited rc=${rc}"
+fi
+
+FULL_CONFIG="${FULL_CONFIG:-$POLICY_ROOT/configs/libero_version_d_new_yjh.yaml}"
+FULL_RUN="${FULL_RUN:-$LIBERO_WORK/runs/libero_version_d_spatial}"
+if [[ -s "$FULL_RUN/libero_pair_summary.json" ]]; then
+  log "LIBERO Version D 10-task run already complete"
+else
+  gpu="$(wait_for_gpu)"
+  log "claim GPU${gpu}: LIBERO Version D 10-task matched run"
+  POLICY_ROOT="$POLICY_ROOT" \
+  LIBERO_VERSION_D_CONFIG="$FULL_CONFIG" \
+  LIBERO_VERSION_D_RUN="$FULL_RUN" \
+  LIBERO_CACHE_MAX_SAMPLES="${LIBERO_FULL_CACHE_MAX_SAMPLES:-12000}" \
+  LIBERO_TASK_IDS="${LIBERO_FULL_TASK_IDS:-0 1 2 3 4 5 6 7 8 9}" \
+  LIBERO_NUM_TRIALS="${LIBERO_FULL_NUM_TRIALS:-10}" \
+  LIBERO_TRAIN_GPU="$gpu" \
+  LIBERO_EVAL_GPU="$gpu" \
+  bash "$LIBERO_RUNNER"
+  log "LIBERO Version D 10-task run exited rc=$?"
 fi
 
 log "priority queue finished"
