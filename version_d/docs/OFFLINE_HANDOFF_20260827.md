@@ -404,3 +404,9 @@ RoboCasa365规模大、任务长且科学价值高，但包含大量厨房任务
 5. 正向后扩大到n=50；
 6. 只做能解释结果的关键消融；
 7. LIBERO闭环后再考虑CALVIN，不要先开第三条大工程。
+
+## 9. 2026-08-27 晚间恢复运行记录
+
+- New_yjh 已部署 `wait_and_run_priority_new_yjh.sh`：检测到真正空闲 GPU 后，先补齐 RoboTwin hard10 的3个缺失随机化任务，再执行LIBERO-Spatial Version D小规模pilot。两个阶段均支持断点续跑。
+- FiveAges 的LIBERO90评测发现PyTorch 2.6+兼容问题：`torch.load`默认启用`weights_only=True`，导致可信的LIBERO初始状态文件无法反序列化。两台服务器均已将该调用改为显式`weights_only=False`。
+- 可复用补丁位于 `version_d/patches/libero_torch26_weights_only.patch`。该参数只应对项目自带、来源可信的LIBERO init-state文件使用。
