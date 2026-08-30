@@ -36,7 +36,9 @@ hidden_dim: 1024
 action_dim: 7
 inverse_hidden_size: 1024
 
-hard_sample_fraction: 0.5
+# RoboTwin keyword sampling is disabled for LIBERO: its prompt vocabulary is
+# different, so using the RoboTwin keywords would produce an empty hard group.
+hard_sample_fraction: 0.0
 hard_task_keywords:
   - "next to the ramekin"
   - "on the cookie box"

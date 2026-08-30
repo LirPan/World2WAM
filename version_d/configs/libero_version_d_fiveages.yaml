@@ -44,7 +44,9 @@ inverse_hidden_size: 1024
 
 # Fixed before evaluation; no task/seed selection is performed at test time.
 # These phrases are LIBERO training prompts, not evaluation filters.
-hard_sample_fraction: 0.5
+# RoboTwin keyword sampling is disabled for LIBERO: its prompt vocabulary is
+# different, so using the RoboTwin keywords would produce an empty hard group.
+hard_sample_fraction: 0.0
 hard_task_keywords:
   - "next to the ramekin"
   - "on the cookie box"

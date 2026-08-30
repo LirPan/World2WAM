@@ -4,7 +4,7 @@
 set -euo pipefail
 
 POLICY_ROOT="${POLICY_ROOT:-/DATA/disk0/yjh/robotwin_w2wam/latest/code/policy_lora}"
-FASTWAM_ROOT="${FASTWAM_ROOT:-/DATA/disk0/yjh/libero_work_wj/code/FastWAM_official}"
+FASTWAM_ROOT="${FASTWAM_ROOT:-/DATA/disk0/yjh/libero_work_wj}"
 LIBERO_ROOT="${LIBERO_ROOT:-/DATA/disk0/yjh/world2wam/plr/yjh_space_backup_20250602/idea2_workspace/code/LIBERO_fresh}"
 PY="${PYTHON_BIN:-/DATA/disk0/yjh/libero_work_wj/env/libero_venv/bin/python}"
 CONFIG="${LIBERO_VERSION_D_CONFIG:-$POLICY_ROOT/configs/libero_version_d_new_yjh.yaml}"
