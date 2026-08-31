@@ -2,18 +2,18 @@
 
 Version D records the current RoboTwin improvement method and its reproducible evaluation entry points.
 
-## 2026-08-27 status
+## 2026-08-31 status
 
 The latest strict, no-GraphLite RoboTwin hard-10 pair uses 10 episodes per
-task.  Version D improves clean success from 47% to 54% (+7 percentage
-points).  Random evaluation is not yet complete: on the eight tasks with
-results for both methods, R0 is 47.5% and Version D is 45.0%.  Three failed
-simulator jobs must be rerun before reporting the random aggregate.
+task and condition. Version D improves clean success from 47% to 54% (+7
+percentage points) and random success from 42% to 45% (+3 percentage points).
+Both comparisons contain all 10 matched tasks and have no failed jobs. This is
+a fixed hard-task subset result, not the full RoboTwin benchmark.
 
 The official Fast-WAM LIBERO-90 baseline completed 90 tasks and 4,500
-episodes, with 681 successes (15.13%).  LIBERO Version D has not yet been
-trained or evaluated; only the first text-embedding preparation step is
-complete.
+episodes, with 681 successes (15.13%). LIBERO Spatial Version D has completed
+the 12,000-sample latent cache, 6,000-step training, and merged-checkpoint
+export. Its matched simulator evaluation is still pending.
 
 See `docs/OFFLINE_HANDOFF_20260827.md` for the exact evidence, exclusions,
 resume commands, paper checklist, and benchmark migration plan.

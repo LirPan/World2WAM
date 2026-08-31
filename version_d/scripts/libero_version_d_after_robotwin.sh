@@ -95,7 +95,7 @@ run_eval() {
       "EVALUATION.task_suite_name=libero_spatial" \
       "EVALUATION.task_id=$task_id" \
       "EVALUATION.num_trials=$NUM_TRIALS" \
-      "EVALUATION.gpu_id=0" \
+      "gpu_id=0" \
       "EVALUATION.device=cuda" \
       "EVALUATION.dataset_stats_path=$STATS" \
       "EVALUATION.output_dir=$out"

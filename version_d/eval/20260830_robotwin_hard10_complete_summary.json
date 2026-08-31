@@ -1,0 +1,37 @@
+{
+  "protocol": "official_robotwin_standard_no_graph_lite",
+  "task_subset": "keyword-defined hard-10",
+  "task_count": 10,
+  "episodes_per_task_per_condition": 10,
+  "tasks": [
+    "beat_block_hammer",
+    "move_stapler_pad",
+    "pick_dual_bottles",
+    "place_dual_shoes",
+    "press_stapler",
+    "put_object_cabinet",
+    "stack_blocks_three",
+    "stack_bowls_three",
+    "stamp_seal",
+    "turn_switch"
+  ],
+  "paired_comparison": {
+    "clean": {
+      "matched_task_count": 10,
+      "r0_success_rate": 0.47,
+      "version_d_success_rate": 0.54,
+      "delta_percentage_points": 7.0,
+      "complete": true
+    },
+    "random": {
+      "matched_task_count": 10,
+      "r0_success_rate": 0.42,
+      "version_d_success_rate": 0.45,
+      "delta_percentage_points": 3.0,
+      "complete": true
+    }
+  },
+  "failures": [],
+  "source": "/DATA/disk0/yjh/robotwin_w2wam/runs/robotwin_hard10_standard_pair_n10_v2/summary.json",
+  "note": "This is a fixed hard-task subset result, not the full RoboTwin benchmark."
+}
