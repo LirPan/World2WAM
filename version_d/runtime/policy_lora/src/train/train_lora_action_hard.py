@@ -91,12 +91,25 @@ def train(cfg: dict, args: argparse.Namespace) -> None:
 
     seed = int(args.seed if args.seed is not None else cfg.get("seed", 42))
     hard_keywords = list(cfg.get("hard_task_keywords") or [])
-    weights, sampling_stats = build_balanced_weights(
-        dataset,
-        keywords=hard_keywords,
-        hard_fraction=float(cfg.get("hard_sample_fraction", 0.5)),
-        manifest_path=out_dir / "sampling_manifest.json",
+    hard_fraction = float(
+        args.hard_sample_fraction
+        if args.hard_sample_fraction is not None
+        else cfg.get("hard_sample_fraction", 0.5)
     )
+    if hard_keywords and 0.0 < hard_fraction < 1.0:
+        weights, sampling_stats = build_balanced_weights(
+            dataset,
+            keywords=hard_keywords,
+            hard_fraction=hard_fraction,
+            manifest_path=out_dir / "sampling_manifest.json",
+        )
+    else:
+        weights = torch.ones(len(dataset), dtype=torch.double)
+        sampling_stats = {
+            "hard_count": 0,
+            "easy_count": len(dataset),
+            "hard_fraction": 0.0,
+        }
     logger.info("Balanced sampling: %s", sampling_stats)
 
     backbone_params = [p for p in wrapper.model.parameters() if p.requires_grad]
@@ -250,6 +263,7 @@ def main() -> None:
     parser.add_argument("--resume-from", default=None)
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--hard-sample-fraction", type=float, default=None)
     args = parser.parse_args()
     cfg = load_config(resolve_path(args.config, minimal_project_root()))
     set_seed(int(args.seed if args.seed is not None else cfg.get("seed", 42)))

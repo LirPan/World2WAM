@@ -3,14 +3,17 @@
 This directory contains the Python source snapshot that produced the current
 RoboTwin Version D checkpoints and evaluations on the yjh servers.
 
-- Snapshot date: 2026-08-27
+- Snapshot date: 2026-09-02
 - Source host: `New_yjh` / `fiveages-A100-3`
 - Server source root:
   `/DATA/disk0/yjh/robotwin_w2wam/latest/code/policy_lora/src`
 - Cross-server verification: the core R3 files had identical SHA-256 hashes on
   `New_yjh` and `FiveAges_A100_2`.
 
-The runtime is an overlay for an external Fast-WAM checkout; it does not vendor
+The snapshot now includes the manifest-based stratified cache selection,
+per-ablation CLI overrides, and resume-safe 6,000-step training entry points
+used by the ICLR 2027 sprint. The runtime is an overlay for an external
+Fast-WAM checkout; it does not vendor
 Fast-WAM weights, RoboTwin/LIBERO datasets, simulator assets, or checkpoints.
 Put `policy_lora/src` at the root of the server-side policy workspace and keep
 the external paths in the YAML configuration valid.

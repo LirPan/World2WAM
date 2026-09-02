@@ -1,8 +1,8 @@
 # Large or machine-local artifacts must stay outside the repository.
-checkpoints/
-data/
-cache/
-runs/
+/checkpoints/
+/data/
+/cache/
+/runs/
 *.pt
 *.safetensors
 *.tar.gz

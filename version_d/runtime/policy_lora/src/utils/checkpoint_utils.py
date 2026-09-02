@@ -92,7 +92,28 @@ def verify_future_latent_cache(cfg: dict[str, Any], sample_indices: list[int] | 
     cache = FutureLatentCache(cfg["cache_dir"], dataset_name=cfg.get("project_name", "world2wam_minimal"))
     anchor = int(cfg.get("anchor_action_idx", 0))
     horizon = int(cfg.get("future_horizon", 1))
-    indices = sample_indices if sample_indices is not None else [0, 1, 2, 3, 4]
+    indices = sample_indices
+    if indices is None:
+        manifest_dir = Path(cfg["cache_dir"]) / cfg.get("project_name", "world2wam_minimal")
+        indices = []
+        for manifest_path in sorted(manifest_dir.glob("manifest*.json")):
+            try:
+                payload = __import__("json").loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not bool(payload.get("complete", False)):
+                continue
+            indices.extend(
+                int(record["dataset_index"])
+                for record in payload.get("records", [])
+                if bool(record.get("valid", False)) and "dataset_index" in record
+            )
+            if indices:
+                break
+        if not indices:
+            indices = [0, 1, 2, 3, 4]
+        else:
+            indices = indices[:5]
     found = [i for i in indices if cache.has_future_latent(i, anchor, horizon)]
     if not found:
         missing = indices

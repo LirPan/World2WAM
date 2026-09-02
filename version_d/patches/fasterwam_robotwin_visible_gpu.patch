@@ -1,0 +1,39 @@
+diff --git a/experiments/robotwin/run_robotwin_manager.py b/experiments/robotwin/run_robotwin_manager.py
+index 5c25aab..ee633b6 100644
+--- a/experiments/robotwin/run_robotwin_manager.py
++++ b/experiments/robotwin/run_robotwin_manager.py
+@@ -134,13 +134,30 @@ def main(cfg: DictConfig):
+     if not robotwin_root.exists():
+         raise FileNotFoundError(f"RoboTwin root not found: {robotwin_root}")
+ 
+-    num_gpus = int(cfg.MULTIRUN.num_gpus)
+-    if num_gpus <= 0:
+-        raise ValueError("`MULTIRUN.num_gpus` must be > 0.")
++    visible = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
++    if visible:
++        gpu_ids = []
++        for item in visible.split(","):
++            item = item.strip()
++            if item == "":
++                continue
++            try:
++                gpu_ids.append(int(item))
++            except ValueError as exc:
++                raise ValueError(
++                    "RoboTwin manager requires numeric CUDA_VISIBLE_DEVICES entries, "
++                    f"got {visible!r}."
++                ) from exc
++    else:
++        num_gpus = int(cfg.MULTIRUN.num_gpus)
++        if num_gpus <= 0:
++            raise ValueError("`MULTIRUN.num_gpus` must be > 0.")
++        gpu_ids = list(range(num_gpus))
++    if not gpu_ids or len(set(gpu_ids)) != len(gpu_ids):
++        raise ValueError(f"Invalid GPU IDs: {gpu_ids}")
+     max_tasks_per_gpu = int(cfg.MULTIRUN.max_tasks_per_gpu)
+     if max_tasks_per_gpu <= 0:
+         raise ValueError("`MULTIRUN.max_tasks_per_gpu` must be > 0.")
+-    gpu_ids = list(range(num_gpus))
+ 
+     output_dir = _resolve_path(str(cfg.EVALUATION.output_dir), base=PROJECT_ROOT)
+     run_ts = output_dir.name

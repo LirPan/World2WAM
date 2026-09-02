@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "name": "world2wam_iclr2027_paper_sprint",
+  "frozen_at": "2026-09-01T21:50:00+08:00",
+  "venue": "ICLR 2027",
+  "allowed_gpus": [1, 2, 3, 4, 5, 6, 7],
+  "excluded_gpus": {"0": "zw VLLM; never co-schedule"},
+  "training": {
+    "seeds": [42, 43, 44],
+    "steps": 6000,
+    "save_every": 500,
+    "libero_samples_per_suite": 3000,
+    "libero_selection_seed": 42,
+    "methods": ["B1", "B2", "B3", "B4", "B5"],
+    "robotwin_methods": ["B1", "B2", "B3", "B4", "B5", "B5_no_hard"]
+  },
+  "benchmarks": {
+    "libero": {
+      "suites": ["libero_10", "libero_goal", "libero_object", "libero_spatial"],
+      "tasks_per_suite": 10,
+      "episodes_per_task": 50,
+      "eval_seed": 42
+    },
+    "libero_plus": {
+      "suites": ["libero_10", "libero_goal", "libero_object", "libero_spatial"],
+      "total_tasks": 10030,
+      "episodes_per_task": 1,
+      "sample_ratio": 0.15,
+      "sample_seed": 42,
+      "perturbations": ["camera", "robot", "language", "light", "background", "noise", "layout"]
+    },
+    "robotwin": {
+      "tasks": 50,
+      "conditions": ["demo_clean", "demo_randomized"],
+      "episodes_per_task_condition": 10,
+      "eval_seed_base": 4300000
+    }
+  },
+  "baselines": {
+    "fastwam": "official release checkpoint",
+    "fasterwam": "hustvl/FasterWAM official release checkpoint"
+  },
+  "statistics": {
+    "bootstrap_samples": 10000,
+    "confidence": 0.95,
+    "paired": true,
+    "report_train_seed_mean_std": true,
+    "mcnemar_libero_plus": true
+  },
+  "quality_gates": {
+    "minimum_free_disk_gb": 200,
+    "gpu_idle_memory_mb": 2000,
+    "gpu_idle_utilization_percent": 10,
+    "gpu_idle_consecutive_checks": 3,
+    "max_attempts": 3,
+    "retry_delays_seconds": [60, 300, 900],
+    "fastwam_spatial_reference_rate": 0.962,
+    "fastwam_spatial_max_absolute_drift": 0.02
+  },
+  "pinned_sources": {
+    "fasterwam": "83667817df0d4f823f39d90700e61ea2f432ac45",
+    "libero_plus": "4976dc3"
+  }
+}

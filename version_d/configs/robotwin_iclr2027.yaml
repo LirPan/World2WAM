@@ -1,0 +1,53 @@
+project_name: world2wam_robotwin_lora_fic
+experiment_role: robotwin_iclr2027
+fastwam_root: /DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official
+fastwam_task_config: robotwin_uncond_3cam_384_1e-4
+official_fastwam_checkpoint: /DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/checkpoints/fastwam_release/robotwin_uncond_3cam_384.pt
+checkpoint_path: /DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/checkpoints/fastwam_release/robotwin_uncond_3cam_384.pt
+dataset_stats_path: /DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/checkpoints/fastwam_release/robotwin_uncond_3cam_384_dataset_stats.json
+lerobot_dataset_dirs:
+  - /DATA/disk0/yjh/robotwin_w2wam/data/robotwin2.0/robotwin2.0
+
+backbone_mode: lora
+lora_rank: 8
+lora_alpha: 16
+lora_target_modules: [q, k, v, o]
+policy_action_only_loss: true
+use_future_latent_distill: true
+train_future_head: true
+use_gt_action_for_future_head: true
+use_target_future_for_inverse_head: true
+enable_inverse: true
+enable_cycle: true
+lambda_action: 1.0
+lambda_fwd: 0.1
+lambda_inv: 0.05
+lambda_cycle: 0.05
+world_loss_scale: 1.0
+world_gradient_mode: project_conflicts
+gradient_log_every: 100
+future_loss_warmup_steps: 500
+
+future_horizon: 1
+future_latent_dim: 48
+hidden_dim: 1024
+action_dim: 14
+inverse_hidden_size: 1024
+hard_sample_fraction: 0.7
+hard_task_keywords: [dual, three, stapler, hammer, cabinet, switch, stamp]
+
+batch_size: 1
+num_epochs: 200
+lr: 1.0e-4
+backbone_lr: 5.0e-5
+seed: 42
+num_workers: 2
+device: cuda
+mixed_precision: bf16
+cache_dir: /DATA/disk0/yjh/robotwin_w2wam/cache/world2wam_robotwin/future_latents
+output_dir: /DATA/disk0/yjh/world2wam_iclr2027/runs/robotwin_train/base
+log_every: 20
+save_every: 500
+keep_last_checkpoints: 3
+max_train_steps: 6000
+precompute_max_samples: 4096

@@ -173,12 +173,20 @@ def train_lora_fic(cfg: dict, args: argparse.Namespace) -> None:
         anchor_action_idx=int(cfg.get("anchor_action_idx", 0)),
         cache=cache,
     )
-    n_cached = min(int(cfg.get("precompute_max_samples") or len(dataset)), len(dataset))
+    n_cached_cfg = cfg.get("precompute_max_samples")
+    n_cached = min(int(n_cached_cfg), len(dataset)) if n_cached_cfg else None
+    manifest_paths = sorted(
+        (Path(cfg["cache_dir"]) / cfg.get("project_name", "world2wam_lora_fic_hard")).glob(
+            "manifest*.json"
+        )
+    )
     usable_indices = cached_indices(
         cache=cache,
         max_samples=n_cached,
         anchor_action_idx=int(cfg.get("anchor_action_idx", 0)),
         future_horizon=int(cfg["future_horizon"]),
+        dataset_length=len(dataset),
+        manifest_paths=manifest_paths,
     )
     if not usable_indices:
         raise FileNotFoundError("No valid future-latent cache entries were found")
@@ -186,12 +194,16 @@ def train_lora_fic(cfg: dict, args: argparse.Namespace) -> None:
     logger.info(
         "Using %d cached samples from first %d dataset indices",
         len(usable_indices),
-        n_cached,
+        n_cached if n_cached is not None else len(dataset),
     )
 
     seed = int(args.seed if args.seed is not None else cfg.get("seed", 42))
     hard_keywords = list(cfg.get("hard_task_keywords") or [])
-    hard_fraction = float(cfg.get("hard_sample_fraction", 0.5))
+    hard_fraction = float(
+        args.hard_sample_fraction
+        if args.hard_sample_fraction is not None
+        else cfg.get("hard_sample_fraction", 0.5)
+    )
     # RoboTwin initially uses the official mixed-task distribution.  Keep the
     # LIBERO hard-task sampler unchanged when a valid split is requested.
     if hard_keywords and 0.0 < hard_fraction < 1.0:
@@ -492,6 +504,12 @@ def main() -> None:
     parser.add_argument("--resume-from", default=None)
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--lambda-fwd", type=float, default=None)
+    parser.add_argument("--lambda-inv", type=float, default=None)
+    parser.add_argument("--lambda-cycle", type=float, default=None)
+    parser.add_argument("--enable-inverse", choices=["true", "false"], default=None)
+    parser.add_argument("--enable-cycle", choices=["true", "false"], default=None)
+    parser.add_argument("--hard-sample-fraction", type=float, default=None)
     parser.add_argument(
         "--gradient-mode",
         default=None,
@@ -500,6 +518,17 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_config(resolve_path(args.config, minimal_project_root()))
+    for argument, key in (
+        (args.lambda_fwd, "lambda_fwd"),
+        (args.lambda_inv, "lambda_inv"),
+        (args.lambda_cycle, "lambda_cycle"),
+    ):
+        if argument is not None:
+            cfg[key] = argument
+    if args.enable_inverse is not None:
+        cfg["enable_inverse"] = args.enable_inverse == "true"
+    if args.enable_cycle is not None:
+        cfg["enable_cycle"] = args.enable_cycle == "true"
     set_seed(int(args.seed if args.seed is not None else cfg.get("seed", 42)))
     train_lora_fic(cfg, args)
 
