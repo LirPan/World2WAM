@@ -8,12 +8,20 @@ FlowMatchingActionHead — 你的独立贡献（Flow Matching / VLA-Corrector �
 - 零侵入：不修改学长任何 train_lora_* / fastwam_wrapper.py；仅供新增的
   wrappers/flow_corrector.py 与 train_flow_action.py / eval_flow_action.py 调用。
 
-Flow 形式（corrector 路线，确定性默认）：
+Flow 形式（corrector 路线）：
   x0 = a0 (base FastWAM 输出，作为 source)
   x1 = a* (真实动作 / 数据流形，作为 target)
-  训练目标：v_theta(x_t, t, cond) ≈ (x1 - x0)，其中 x_t = (1-t)*x0 + t*x1
+  path_type="straight"（残差 MLP 等价基线，供 guide 要求的同参数对比）：
+      x_t = (1-t)*x0 + t*x1,  目标速度 u_t = (x1 - x0) 为常量
+      -> 多步 Euler 收敛 == 单步残差，验证"本质还是 MLP"这一判读。
+  path_type="gaussian"（T1 创新路径，默认）：带时间相关噪声的条件流
+      sigma_t = sigma * t*(1-t)            (端点 sigma=0，保证 x_0=a0, x_1=a1)
+      x_t = (1-t)*x0 + t*x1 + sigma_t * eps,  eps ~ N(0, I)
+      目标速度 u_t = (x1 - x0) + sigma'_t * eps = (x1-x0) + sigma*(1-2t)*eps
+      -> u_t 在 t 与 eps 上都非常量，速度场非平凡，多步积分真正有意义
+         （不再等价于单步残差 MLP）。对应 Tong 2023 广义条件流匹配。
   推理：a_{k+1} = a_k + (1/N) * v_theta(a_k, t_k, cond)，t: 0 -> 1
-可选加噪（stochastic corrector）：x0 = a0 + sigma*eps。
+  sigma_noise>0（推理期可选）：在 source 上额外加噪做 stochastic 采样。
 
 动作张量约定：a 形状 [B, T, D]（T=action_horizon, D=action_dim），内部展平到 [B, T*D]。
 """
@@ -52,13 +60,19 @@ class FlowMatchingActionHead(nn.Module):
         time_embed_dim: int = 64,
         num_layers: int = 3,
         dropout: float = 0.0,
+        path_type: str = "gaussian",
+        sigma: float = 0.1,
     ):
         super().__init__()
+        if path_type not in ("straight", "gaussian"):
+            raise ValueError(f"path_type must be 'straight' or 'gaussian', got {path_type!r}")
         self.action_dim = int(action_dim)
         self.horizon = int(horizon)
         self.cond_dim = int(cond_dim)
         self.time_embed_dim = int(time_embed_dim)
         self.action_flat_dim = self.action_dim * self.horizon
+        self.path_type = path_type
+        self.sigma = float(sigma)
 
         # 入参：展平动作 [B, T*D] + 时间嵌入 [B, time_embed_dim] + 条件 [B, cond_dim]
         in_dim = self.action_flat_dim + time_embed_dim + self.cond_dim
@@ -116,16 +130,50 @@ class FlowMatchingActionHead(nn.Module):
         t: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
-        标准 flow matching 损失。
-        a0: [B,T,D] source（base 动作，可加噪）  a1: [B,T,D] target（真实动作）
-        返回 MSE over predicted velocity vs (a1 - a0)。
+        Flow matching 速度回归损失。
+        a0: [B,T,D] source（base 动作）  a1: [B,T,D] target（真实动作）
+        返回 MSE over 预测速度 vs 路径目标速度 u_t。
+        - path_type="straight": u_t = a1 - a0（常量，等价残差 MLP）
+        - path_type="gaussian": u_t = (a1-a0) + sigma*(1-2t)*eps，非常量（T1）
         """
+        if a0.shape != a1.shape:
+            raise ValueError(f"a0 {tuple(a0.shape)} != a1 {tuple(a1.shape)}")
         if t is None:
             t = torch.rand(a0.shape[0], device=a0.device, dtype=a0.dtype)
-        a_t = (1.0 - t[:, None, None]) * a0 + t[:, None, None] * a1
-        v_target = a1 - a0
+        t3 = t[:, None, None]  # [B,1,1]
+        if self.path_type == "straight":
+            a_t = (1.0 - t3) * a0 + t3 * a1
+            v_target = a1 - a0
+        else:  # gaussian (CFM with time-dependent noise schedule)
+            eps = torch.randn_like(a0)
+            sig_t = self.sigma * t3 * (1.0 - t3)          # sigma* t(1-t)
+            sig_dt = self.sigma * (1.0 - 2.0 * t3)        # d/dt sigma_t
+            a_t = (1.0 - t3) * a0 + t3 * a1 + sig_t * eps
+            v_target = (a1 - a0) + sig_dt * eps
         v_pred = self.forward(a_t, t, cond)
         return ((v_pred - v_target) ** 2).mean()
+
+    @staticmethod
+    def trajectory_dispersion(
+        traj: list[torch.Tensor],
+        dim: tuple[int, ...] = (-1,),
+    ) -> torch.Tensor:
+        """
+        T2 用：把多步 flow 轨迹的离散度当作"免费不确定性"估计。
+        输入 traj: list of [B,T,D]（含起点），返回 [B] 每样本平均离散度。
+        离散度 = 轨迹各步沿动作维的 std 的均值（小=流稳定，大=流不确定）。
+        """
+        if len(traj) < 2:
+            raise ValueError("need >=2 trajectory points")
+        stack = torch.stack(traj, dim=0)  # [S, B, T, D]
+        # 沿 step 维(S) 算 std，再在动作维聚合 -> 每样本标量 [B]
+        disp = stack.std(dim=0, unbiased=False)  # [B, T, D]
+        if dim == (-1,):
+            # 默认：把 T、D 全部压成每样本标量
+            reduce_dims = tuple(range(1, disp.dim()))
+        else:
+            reduce_dims = dim
+        return disp.mean(dim=reduce_dims)  # [B]
 
     # ---------- 推理：Euler 积分（corrector 路线） ----------
     @torch.no_grad()

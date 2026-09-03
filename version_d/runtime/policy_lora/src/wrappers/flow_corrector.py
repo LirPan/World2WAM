@@ -36,12 +36,26 @@ class FlowCorrector(nn.Module):
         num_steps: int = 10,
         sigma_noise: float = 0.0,
         cond_encoder: Optional[nn.Module] = None,
+        use_gate: bool = True,
+        gate_beta: float = 5.0,
     ):
         super().__init__()
         self.head = head
         self.num_steps = int(num_steps)
         self.sigma_noise = float(sigma_noise)
         self.cond_encoder = cond_encoder  # 可选：将观测帧 -> cond [B, cond_dim]
+        self.use_gate = bool(use_gate)
+        self.gate_beta = float(gate_beta)
+
+    @staticmethod
+    def _gate_alpha(uncertainty: torch.Tensor, beta: float) -> torch.Tensor:
+        """
+        T2：把流轨迹离散度映射成 [0,1] 的信任门 α。
+          alpha = 1 / (1 + beta * uncertainty)
+          - uncertainty 小（流稳定）-> alpha -> 1，信任校正
+          - uncertainty 大（流不确定）-> alpha -> 0，回退 base，避免 introduced regression
+        """
+        return 1.0 / (1.0 + beta * uncertainty.clamp(min=0.0))
 
     @torch.no_grad()
     def correct(
@@ -74,16 +88,31 @@ class FlowCorrector(nn.Module):
         cond = cond.to(device=a0.device, dtype=a0.dtype)
 
         # 3) flow 积分：a0 -> a* （corrector 路线，base 始终冻结）
-        a_refined = self.head.sample(
+        a_refined, traj = self.head.sample(
             cond=cond,
             x_source=a0,
             num_steps=self.num_steps,
             sigma_noise=self.sigma_noise,
+            return_traj=True,
         )
+
+        # 4) T2：用多步轨迹离散度当免费不确定性，选择性校正
+        if self.use_gate:
+            uncertainty = FlowMatchingActionHead.trajectory_dispersion(traj)  # [B]
+            alpha = self._gate_alpha(uncertainty, self.gate_beta).view(-1, 1, 1)
+            a_final = alpha * a_refined + (1.0 - alpha) * a0
+        else:
+            uncertainty = FlowMatchingActionHead.trajectory_dispersion(traj)
+            alpha = torch.ones(1, 1, 1, device=a0.device)
+            a_final = a_refined
+
         return {
-            "pred_action": a_refined,
+            "pred_action": a_final,
+            "pred_action_refined": a_refined,
             "pred_action_init": a0,
             "used_flow": True,
+            "uncertainty": uncertainty,   # [B]
+            "gate_alpha": alpha,          # [B,1,1]
         }
 
     @staticmethod
