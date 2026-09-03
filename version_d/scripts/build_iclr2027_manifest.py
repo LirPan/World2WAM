@@ -116,7 +116,7 @@ def build(root: Path, protocol_path: Path) -> dict:
         job(
             "bootstrap_robotwin",
             ["bash", str(scripts / "bootstrap_iclr2027_robotwin_new_yjh.sh")],
-            resource="gpu",
+            resource="cpu",
             depends_on=["bootstrap"],
             stage="P0",
             expected=[
@@ -140,6 +140,21 @@ def build(root: Path, protocol_path: Path) -> dict:
                     "path": str(status / "libero_training_data.complete.json"),
                     "type": "json",
                     "required_keys": ["complete"],
+                }
+            ],
+        )
+    )
+    jobs.append(
+        job(
+            "prepare_libero_text_embeds",
+            ["bash", str(scripts / "prepare_iclr2027_libero_text_embeds.sh")],
+            depends_on=["download_libero_training_data"],
+            stage="P0-text-cache",
+            expected=[
+                {
+                    "path": str(status / "libero_text_embeds.complete.json"),
+                    "type": "json",
+                    "required_keys": ["complete", "prompt_count", "cache_file_count"],
                 }
             ],
         )
@@ -191,7 +206,7 @@ def build(root: Path, protocol_path: Path) -> dict:
             job(
                 job_id,
                 ["bash", str(scripts / "run_iclr2027_libero_cache_shard.sh"), str(shard), "4"],
-                depends_on=["download_libero_training_data"],
+                depends_on=["prepare_libero_text_embeds"],
                 stage="P0-cache",
                 expected=[
                     {
@@ -208,7 +223,7 @@ def build(root: Path, protocol_path: Path) -> dict:
         for seed in (42, 43, 44):
             job_id = f"train_{method}_s{seed}"
             train_ids[(method, seed)] = job_id
-            dependencies = ["download_libero_training_data"] if method == "B1" else cache_ids
+            dependencies = ["prepare_libero_text_embeds"] if method == "B1" else cache_ids
             checkpoint = root / "checkpoints/libero" / f"{method}_s{seed}.pt"
             jobs.append(
                 job(

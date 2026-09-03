@@ -65,6 +65,10 @@ def validate_expected(items: list[dict[str, Any]]) -> bool:
             required = item.get("required_keys", [])
             if any(key not in payload for key in required):
                 return False
+            # Incremental manifests contain the key from their first atomic
+            # checkpoint onward. Presence alone is not job completion.
+            if "complete" in required and payload.get("complete") is not True:
+                return False
     return True
 
 
@@ -152,9 +156,40 @@ class Scheduler:
         self.max_util = int(self.manifest.get("gpu_idle_utilization_percent", 10))
         self.idle_checks = int(self.manifest.get("gpu_idle_consecutive_checks", 3))
         self.idle_interval = float(self.manifest.get("gpu_idle_check_interval_seconds", 2))
+        self.poll_seconds = float(self.manifest.get("scheduler_poll_seconds", 3))
         self.running: dict[str, Running] = {}
         self.next_retry: dict[str, float] = {}
         self._validate_manifest()
+
+    @staticmethod
+    def process_group_alive(pid: int | None) -> bool:
+        if not pid:
+            return False
+        try:
+            os.killpg(int(pid), 0)
+        except (ProcessLookupError, PermissionError, ValueError):
+            return False
+        return True
+
+    @staticmethod
+    def scheduling_priority(job: dict[str, Any]) -> tuple[int, str]:
+        """Run paper-critical prerequisites and B5 before secondary ablations."""
+        job_id = str(job["id"])
+        if job_id.startswith("libero_cache_shard_"):
+            rank = 0
+        elif job_id.startswith("train_B5_s"):
+            rank = 10
+        elif job_id.startswith("train_B1_s"):
+            rank = 20
+        elif job_id.startswith(("train_B2_s", "train_B3_s", "train_B4_s")):
+            rank = 30
+        elif job_id.startswith("plus15_B5_s"):
+            rank = 40
+        elif job_id.startswith("libero_full_B5_s"):
+            rank = 50
+        else:
+            rank = 100
+        return rank, job_id
 
     def reconcile_artifacts(self) -> None:
         """Adopt complete artifacts after supervisor replacement or host reboot."""
@@ -169,6 +204,18 @@ class Scheduler:
                     status="complete",
                     recovered_from_artifacts=True,
                     return_code=0,
+                )
+                continue
+            if (
+                state.get("status") == "running"
+                and job_id not in self.running
+                and not self.process_group_alive(state.get("pid"))
+            ):
+                self.write_state(
+                    job_id,
+                    status="retry_wait",
+                    recovered_dead_process=True,
+                    reason="recorded process group is no longer alive",
                 )
 
     def _validate_manifest(self) -> None:
@@ -221,7 +268,20 @@ class Scheduler:
     def ready(self, job: dict[str, Any]) -> bool:
         job_id = job["id"]
         state = self.state(job_id)
-        if state.get("status") in {"complete", "failed"}:
+        # A replacement supervisor may inherit jobs that are still running in
+        # their own sessions. Keep those states reserved until the expected
+        # artifact appears and reconcile_artifacts() marks them complete.
+        # Paused/deferred jobs are deliberately excluded from scheduling. This
+        # lets a completed smoke test yield its GPU to formal training without
+        # discarding its partial results. Resume explicitly by setting pending.
+        if state.get("status") in {
+            "complete",
+            "failed",
+            "running",
+            "paused",
+            "deferred",
+            "paused_after_protocol_smoke",
+        }:
             return False
         if job_id in self.running or time.time() < self.next_retry.get(job_id, 0):
             return False
@@ -373,6 +433,17 @@ class Scheduler:
                         break
 
             assigned = {item.gpu for item in self.running.values() if item.gpu is not None}
+            # A restarted scheduler does not own Popen objects for inherited
+            # process groups. Reserve their recorded GPUs while they are alive.
+            for job_id in self.jobs:
+                state = self.state(job_id)
+                gpu = state.get("gpu")
+                if (
+                    state.get("status") == "running"
+                    and gpu is not None
+                    and self.process_group_alive(state.get("pid"))
+                ):
+                    assigned.add(int(gpu))
             candidate_gpus = [gpu for gpu in self.allowed_gpus if gpu not in assigned]
             if candidate_gpus:
                 idle = confirmed_idle_gpus(
@@ -382,11 +453,14 @@ class Scheduler:
                     checks=self.idle_checks,
                     interval=self.idle_interval,
                 )
-                gpu_jobs = [
-                    job
-                    for job in self.jobs.values()
-                    if job.get("resource", "gpu") == "gpu" and self.ready(job)
-                ]
+                gpu_jobs = sorted(
+                    (
+                        job
+                        for job in self.jobs.values()
+                        if job.get("resource", "gpu") == "gpu" and self.ready(job)
+                    ),
+                    key=self.scheduling_priority,
+                )
                 for gpu, job in zip(idle, gpu_jobs):
                     self.launch(job, gpu=gpu)
 
@@ -394,7 +468,7 @@ class Scheduler:
             terminal = [self.state(job_id).get("status") for job_id in self.jobs]
             if not self.running and all(status in {"complete", "failed"} for status in terminal):
                 break
-            time.sleep(10)
+            time.sleep(self.poll_seconds)
 
         self.heartbeat()
 

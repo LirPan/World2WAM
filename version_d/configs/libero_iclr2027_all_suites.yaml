@@ -1,5 +1,8 @@
 project_name: world2wam_iclr2027_libero_all
 experiment_role: iclr2027_libero_all_suites
+training_distribution: standard_libero_only
+evaluation_targets: [standard_libero, libero_plus]
+forbid_libero_plus_training_data: true
 
 fastwam_root: /DATA/disk0/yjh/libero_work_wj/code/FastWAM_official
 libero_root: /DATA/disk0/yjh/world2wam/plr/yjh_space_backup_20250602/idea2_workspace/code/LIBERO_fresh
