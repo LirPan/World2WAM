@@ -15,14 +15,28 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+import importlib.util
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 把 src/ 加入 path
+# 自包含加载：绕过学长 wrappers/__init__ 与 models/__init__ 的重依赖链
+#（仅依赖 torch，满足"无卡只测形状"的初衷）。
+_SRC = Path(__file__).resolve().parents[0]  # src/ 目录
+
+
+def _load_standalone(name: str, rel_path: Path):
+    spec = importlib.util.spec_from_file_location(name, _SRC / rel_path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+flow_head_mod = _load_standalone("flow_matching_action_head", Path("models/flow_matching_action_head.py"))
+flow_corr_mod = _load_standalone("flow_corrector", Path("wrappers/flow_corrector.py"))
+FlowMatchingActionHead = flow_head_mod.FlowMatchingActionHead
+FlowCorrector = flow_corr_mod.FlowCorrector
 
 import torch
 import torch.nn as nn
-
-from models.flow_matching_action_head import FlowMatchingActionHead
-from wrappers.flow_corrector import FlowCorrector
 
 
 def _fake_wrapper(action_dim: int, horizon: int, device: str = "cpu"):

@@ -21,7 +21,10 @@ from typing import Any, Optional
 import torch
 import torch.nn as nn
 
-from ..models.flow_matching_action_head import FlowMatchingActionHead
+try:  # 正式作为 src.wrappers 子包时走相对导入
+    from ..models.flow_matching_action_head import FlowMatchingActionHead
+except ImportError:  # 允许独立冒烟（不触发 models 包 __init__ 的重依赖）
+    from flow_matching_action_head import FlowMatchingActionHead
 
 
 class FlowCorrector(nn.Module):

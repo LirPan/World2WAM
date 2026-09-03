@@ -57,6 +57,7 @@ class FlowMatchingActionHead(nn.Module):
         self.action_dim = int(action_dim)
         self.horizon = int(horizon)
         self.cond_dim = int(cond_dim)
+        self.time_embed_dim = int(time_embed_dim)
         self.action_flat_dim = self.action_dim * self.horizon
 
         # 入参：展平动作 [B, T*D] + 时间嵌入 [B, time_embed_dim] + 条件 [B, cond_dim]
