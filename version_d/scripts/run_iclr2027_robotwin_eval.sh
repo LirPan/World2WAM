@@ -23,7 +23,16 @@ mkdir -p "$OUTPUT"
 export MPLCONFIGDIR="$ROOT/cache/matplotlib/robotwin"
 export NUMBA_CACHE_DIR="$ROOT/cache/numba/robotwin"
 export PYTHONPATH="$FASTER/src:$FASTER${PYTHONPATH:+:$PYTHONPATH}"
-export DIFFSYNTH_MODEL_BASE_PATH="$FASTER/checkpoints"
+# Prefer the already validated shared DiffSynth/Wan cache used by the
+# official FastWAM installation.  The FasterWAM checkout may contain only
+# policy checkpoints; pointing the loader there otherwise triggers a fresh
+# 10+ GB ModelScope download and fails in minimal environments.
+COMMON_MODEL_BASE="${WORLD2WAM_COMMON_MODEL_BASE:-/DATA/disk0/yjh/robotwin_w2wam/third_party/FastWAM_official/checkpoints}"
+if [[ -s "$COMMON_MODEL_BASE/DiffSynth-Studio/Wan-Series-Converted-Safetensors/Wan2.2_VAE.safetensors" ]]; then
+  export DIFFSYNTH_MODEL_BASE_PATH="$COMMON_MODEL_BASE"
+else
+  export DIFFSYNTH_MODEL_BASE_PATH="$FASTER/checkpoints"
+fi
 export DIFFSYNTH_DOWNLOAD_SOURCE="${DIFFSYNTH_DOWNLOAD_SOURCE:-modelscope}"
 mkdir -p "$MPLCONFIGDIR" "$NUMBA_CACHE_DIR"
 

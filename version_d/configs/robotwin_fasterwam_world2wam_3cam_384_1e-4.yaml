@@ -1,0 +1,30 @@
+# @package _global_
+
+# World2WAM/FasterWAM adapter task.  FasterWAM's released checkpoint contains
+# the complete SparseActionDiT path, so initialize the action expert without
+# the unavailable standalone SparseActionDiT pretraining file and then load
+# the released checkpoint through the Version-D wrapper.
+defaults:
+  - override /data: robotwin
+  - override /model: fasterwam
+  - _self_
+
+batch_size: 1
+num_workers: 2
+lr_scheduler_type: cosine
+learning_rate: 1.0e-4
+num_epochs: 1
+max_steps: null
+log_every: 20
+save_every: 0
+eval_every: 0
+gradient_accumulation_steps: 1
+weight_decay: 1.0e-4
+resume: null
+
+model:
+  mot_checkpoint_mixed_attn: false
+  skip_dit_load_from_pretrain: true
+  action_dit_pretrained_path: null
+
+default_action_infer_mode: one_pass_future_cache
